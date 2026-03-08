@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -20,44 +19,45 @@ import (
 )
 
 func main() {
-	// Parse configuration
-	cfg := config.ParseFlags()
+	// Parse CLI flags (only config file path and dev mode)
+	cliCfg := config.ParseFlags()
 
+	log.Printf("Starting logtail with CLI config: %s", cliCfg)
+
+	// Ensure config directory exists
+	if cliCfg.ConfigFile != "" {
+		if err := config.EnsureConfigDir(cliCfg.ConfigFile); err != nil {
+			log.Printf("Warning: could not create config directory: %v", err)
+		}
+	}
+
+	// Load configuration from YAML file
+	configStore := models.NewConfigStore(cliCfg.ConfigFile)
+	cfg := configStore.Get()
+
+	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("Configuration error: %v", err)
 	}
 
-	log.Printf("Starting webtail with configuration: %s", cfg)
+	log.Printf("Loaded configuration from: %s", cliCfg.ConfigFile)
+	log.Printf("Server port: %d, Buffer size: %d MB", cfg.Server.Port, cfg.Buffer.SizeMB)
 
 	// Initialize circular buffer
 	buf := buffer.New(cfg.BufferSizeBytes())
-	log.Printf("Initialized circular buffer with max size: %d MB", cfg.BufferSizeMB)
+	log.Printf("Initialized circular buffer with max size: %d MB", cfg.Buffer.SizeMB)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
 	log.Printf("WebSocket hub started")
 
-	// Initialize settings store
-	// Settings are persisted to a file in the user's config directory
-	settingsPath := ""
-	if configDir, err := os.UserConfigDir(); err == nil {
-		settingsDir := filepath.Join(configDir, "logtail")
-		if err := os.MkdirAll(settingsDir, 0755); err == nil {
-			settingsPath = filepath.Join(settingsDir, "settings.json")
-		}
-	}
-	settings := models.NewSettingsStore(settingsPath, cfg.IngestToken)
-	if settingsPath != "" {
-		log.Printf("Settings stored at: %s", settingsPath)
-	}
-
 	// Create router
-	router := api.NewRouter(buf, hub, webtail.WebAssets, cfg.DevMode, settings)
+	router := api.NewRouter(buf, hub, webtail.WebAssets, cliCfg.DevMode, configStore)
 
 	// Create HTTP server
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.Port),
+		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler:      router,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -66,7 +66,7 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("Server listening on http://localhost:%d", cfg.Port)
+		log.Printf("Server listening on http://localhost:%d", cfg.Server.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}

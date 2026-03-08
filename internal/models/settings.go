@@ -1,74 +1,156 @@
 package models
 
 import (
-	"encoding/json"
 	"os"
 	"sync"
+
+	"gopkg.in/yaml.v3"
 )
 
-// Settings contains application configuration that can be modified at runtime
-type Settings struct {
-	// IngestToken is the authentication token required for the ingest endpoint
+// Config contains all application configuration stored in YAML format
+type Config struct {
+	// Server settings
+	Server ServerConfig `yaml:"server" json:"server"`
+
+	// Ingest settings
+	Ingest IngestConfig `yaml:"ingest" json:"ingest"`
+
+	// Buffer settings
+	Buffer BufferConfig `yaml:"buffer" json:"buffer"`
+}
+
+// ServerConfig contains HTTP server configuration
+type ServerConfig struct {
+	// Port is the HTTP server port (1-65535)
+	Port int `yaml:"port" json:"port"`
+}
+
+// IngestConfig contains ingestion configuration
+type IngestConfig struct {
+	// AuthToken is the authentication token required for the ingest endpoint
 	// If empty, no authentication is required
-	IngestToken string `json:"ingestToken"`
+	AuthToken string `yaml:"auth_token" json:"authToken"`
 
 	// ExclusionPatterns is a list of strings that, if found in a log message,
 	// will cause that message to be discarded during ingestion
-	ExclusionPatterns []string `json:"exclusionPatterns"`
+	ExclusionPatterns []string `yaml:"exclusion_patterns" json:"exclusionPatterns"`
 }
 
-// SettingsStore provides thread-safe access to settings with optional file persistence
-type SettingsStore struct {
-	settings Settings
+// BufferConfig contains buffer configuration
+type BufferConfig struct {
+	// SizeMB is the maximum buffer size in megabytes
+	SizeMB int `yaml:"size_mb" json:"sizeMB"`
+}
+
+// DefaultConfig returns the default configuration
+func DefaultConfig() Config {
+	return Config{
+		Server: ServerConfig{
+			Port: 8080,
+		},
+		Ingest: IngestConfig{
+			AuthToken:         "",
+			ExclusionPatterns: []string{},
+		},
+		Buffer: BufferConfig{
+			SizeMB: 100,
+		},
+	}
+}
+
+// Validate checks if the configuration is valid
+func (c *Config) Validate() error {
+	if c.Server.Port < 1 || c.Server.Port > 65535 {
+		return &ConfigError{Field: "server.port", Message: "must be between 1 and 65535"}
+	}
+	if c.Buffer.SizeMB < 1 {
+		return &ConfigError{Field: "buffer.size_mb", Message: "must be at least 1"}
+	}
+	return nil
+}
+
+// BufferSizeBytes returns the buffer size in bytes
+func (c *Config) BufferSizeBytes() int64 {
+	return int64(c.Buffer.SizeMB) * 1024 * 1024
+}
+
+// ConfigError represents a configuration validation error
+type ConfigError struct {
+	Field   string
+	Message string
+}
+
+func (e *ConfigError) Error() string {
+	return e.Field + ": " + e.Message
+}
+
+// ConfigStore provides thread-safe access to configuration with YAML file persistence
+type ConfigStore struct {
+	config   Config
 	mu       sync.RWMutex
 	filePath string
 }
 
-// NewSettingsStore creates a new settings store
-// If filePath is provided, settings will be persisted to disk
-func NewSettingsStore(filePath string, initialToken string) *SettingsStore {
-	store := &SettingsStore{
-		settings: Settings{
-			IngestToken:       initialToken,
-			ExclusionPatterns: []string{},
-		},
+// NewConfigStore creates a new config store
+// If filePath is provided and exists, configuration will be loaded from it
+// Otherwise, default configuration is used and saved to the file
+func NewConfigStore(filePath string) *ConfigStore {
+	store := &ConfigStore{
+		config:   DefaultConfig(),
 		filePath: filePath,
 	}
 
-	// Try to load settings from file if it exists
 	if filePath != "" {
 		if err := store.loadFromFile(); err != nil {
-			// File doesn't exist or is invalid, use defaults
-			// If an initial token was provided via CLI, use it
-			if initialToken != "" {
-				store.settings.IngestToken = initialToken
-			}
+			// File doesn't exist or is invalid, save defaults
+			_ = store.saveToFile()
 		}
 	}
 
 	return store
 }
 
-// Get returns a copy of the current settings
-func (s *SettingsStore) Get() Settings {
+// Get returns a copy of the current configuration
+func (s *ConfigStore) Get() Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// Return a copy to avoid race conditions
-	return Settings{
-		IngestToken:       s.settings.IngestToken,
-		ExclusionPatterns: append([]string{}, s.settings.ExclusionPatterns...),
+	// Return a deep copy to avoid race conditions
+	return Config{
+		Server: ServerConfig{
+			Port: s.config.Server.Port,
+		},
+		Ingest: IngestConfig{
+			AuthToken:         s.config.Ingest.AuthToken,
+			ExclusionPatterns: append([]string{}, s.config.Ingest.ExclusionPatterns...),
+		},
+		Buffer: BufferConfig{
+			SizeMB: s.config.Buffer.SizeMB,
+		},
 	}
 }
 
-// Update updates the settings and persists them if a file path is configured
-func (s *SettingsStore) Update(settings Settings) error {
+// Update updates the configuration and persists it to the file
+func (s *ConfigStore) Update(config Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.settings = Settings{
-		IngestToken:       settings.IngestToken,
-		ExclusionPatterns: append([]string{}, settings.ExclusionPatterns...),
+	// Validate before updating
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
+	s.config = Config{
+		Server: ServerConfig{
+			Port: config.Server.Port,
+		},
+		Ingest: IngestConfig{
+			AuthToken:         config.Ingest.AuthToken,
+			ExclusionPatterns: append([]string{}, config.Ingest.ExclusionPatterns...),
+		},
+		Buffer: BufferConfig{
+			SizeMB: config.Buffer.SizeMB,
+		},
 	}
 
 	if s.filePath != "" {
@@ -77,39 +159,70 @@ func (s *SettingsStore) Update(settings Settings) error {
 	return nil
 }
 
-// GetIngestToken returns the current ingest token
-func (s *SettingsStore) GetIngestToken() string {
+// GetPort returns the configured server port
+func (s *ConfigStore) GetPort() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.settings.IngestToken
+	return s.config.Server.Port
+}
+
+// GetBufferSizeMB returns the configured buffer size in MB
+func (s *ConfigStore) GetBufferSizeMB() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.config.Buffer.SizeMB
+}
+
+// GetBufferSizeBytes returns the configured buffer size in bytes
+func (s *ConfigStore) GetBufferSizeBytes() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return int64(s.config.Buffer.SizeMB) * 1024 * 1024
+}
+
+// GetIngestToken returns the current ingest auth token
+func (s *ConfigStore) GetIngestToken() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.config.Ingest.AuthToken
 }
 
 // GetExclusionPatterns returns a copy of the current exclusion patterns
-func (s *SettingsStore) GetExclusionPatterns() []string {
+func (s *ConfigStore) GetExclusionPatterns() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return append([]string{}, s.settings.ExclusionPatterns...)
+	return append([]string{}, s.config.Ingest.ExclusionPatterns...)
 }
 
-// loadFromFile loads settings from the configured file path
-func (s *SettingsStore) loadFromFile() error {
+// GetFilePath returns the config file path
+func (s *ConfigStore) GetFilePath() string {
+	return s.filePath
+}
+
+// loadFromFile loads configuration from the YAML file
+func (s *ConfigStore) loadFromFile() error {
 	data, err := os.ReadFile(s.filePath)
 	if err != nil {
 		return err
 	}
 
-	var settings Settings
-	if err := json.Unmarshal(data, &settings); err != nil {
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
 		return err
 	}
 
-	s.settings = settings
+	// Ensure exclusion patterns is not nil
+	if config.Ingest.ExclusionPatterns == nil {
+		config.Ingest.ExclusionPatterns = []string{}
+	}
+
+	s.config = config
 	return nil
 }
 
-// saveToFile saves settings to the configured file path
-func (s *SettingsStore) saveToFile() error {
-	data, err := json.MarshalIndent(s.settings, "", "  ")
+// saveToFile saves configuration to the YAML file
+func (s *ConfigStore) saveToFile() error {
+	data, err := yaml.Marshal(s.config)
 	if err != nil {
 		return err
 	}

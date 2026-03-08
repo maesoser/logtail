@@ -17,7 +17,7 @@ import (
 )
 
 // NewRouter creates and configures the chi router
-func NewRouter(buf *buffer.CircularBuffer, hub *websocket.Hub, webAssets embed.FS, devMode bool, settings *models.SettingsStore) *chi.Mux {
+func NewRouter(buf *buffer.CircularBuffer, hub *websocket.Hub, webAssets embed.FS, devMode bool, config *models.ConfigStore) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Middleware
@@ -37,7 +37,7 @@ func NewRouter(buf *buffer.CircularBuffer, hub *websocket.Hub, webAssets embed.F
 	}))
 
 	// Create handlers
-	handlers := NewHandlers(buf, hub, settings)
+	handlers := NewHandlers(buf, hub, config)
 
 	// Setup WebSocket broadcasting
 	handlers.SetupWebSocketBroadcast()
@@ -47,8 +47,8 @@ func NewRouter(buf *buffer.CircularBuffer, hub *websocket.Hub, webAssets embed.F
 		r.Get("/logs", handlers.HandleGetLogs)
 		r.Get("/stats", handlers.HandleGetStats)
 		r.Get("/values", handlers.HandleGetUniqueValues)
-		r.Get("/settings", handlers.HandleGetSettings)
-		r.Put("/settings", handlers.HandleUpdateSettings)
+		r.Get("/config", handlers.HandleGetConfig)
+		r.Put("/config", handlers.HandleUpdateConfig)
 	})
 
 	// Ingest endpoint

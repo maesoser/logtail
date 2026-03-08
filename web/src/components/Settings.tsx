@@ -1,12 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, Checkbox, Button, Input } from '@cloudflare/kumo';
-import { GearSix, X, Plus, Trash, Eye, EyeSlash, ShieldCheck, Columns, Funnel } from '@phosphor-icons/react';
+import { GearSix, X, Plus, Trash, Eye, EyeSlash, ShieldCheck, Columns, Funnel, Gear } from '@phosphor-icons/react';
 import type { ColumnConfig } from '../types';
 
-// Settings from the backend
-interface BackendSettings {
-  hasIngestToken: boolean;
-  exclusionPatterns: string[];
+// Config from the backend
+interface BackendConfig {
+  server: {
+    port: number;
+  };
+  ingest: {
+    hasAuthToken: boolean;
+    exclusionPatterns: string[];
+  };
+  buffer: {
+    sizeMB: number;
+  };
+  configFile: string;
 }
 
 interface SettingsProps {
@@ -15,7 +24,7 @@ interface SettingsProps {
   onResetColumns?: () => void;
 }
 
-type TabId = 'columns' | 'auth' | 'exclusions';
+type TabId = 'columns' | 'server' | 'auth' | 'exclusions';
 
 export function Settings({
   columns,
@@ -25,10 +34,16 @@ export function Settings({
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('columns');
   
-  // Backend settings state
-  const [backendSettings, setBackendSettings] = useState<BackendSettings | null>(null);
+  // Backend config state
+  const [backendConfig, setBackendConfig] = useState<BackendConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Server settings state
+  const [serverPort, setServerPort] = useState(8080);
+  const [bufferSizeMB, setBufferSizeMB] = useState(100);
+  const [serverDirty, setServerDirty] = useState(false);
   
   // Auth token state
   const [authToken, setAuthToken] = useState('');
@@ -40,53 +55,70 @@ export function Settings({
   const [newPattern, setNewPattern] = useState('');
   const [exclusionsDirty, setExclusionsDirty] = useState(false);
 
-  // Fetch backend settings when dialog opens
+  // Fetch backend config when dialog opens
   useEffect(() => {
     if (isOpen) {
-      fetchSettings();
+      fetchConfig();
     }
   }, [isOpen]);
 
-  const fetchSettings = async () => {
+  const fetchConfig = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const response = await fetch('/api/settings');
+      const response = await fetch('/api/config');
       if (response.ok) {
-        const data: BackendSettings = await response.json();
-        setBackendSettings(data);
-        setExclusionPatterns(data.exclusionPatterns || []);
+        const data: BackendConfig = await response.json();
+        setBackendConfig(data);
+        setServerPort(data.server.port);
+        setBufferSizeMB(data.buffer.sizeMB);
+        setServerDirty(false);
+        setExclusionPatterns(data.ingest.exclusionPatterns || []);
         setExclusionsDirty(false);
         // Don't set authToken - we never receive the actual token from backend
         setAuthToken('');
         setTokenDirty(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch settings:', error);
+    } catch (err) {
+      console.error('Failed to fetch config:', err);
+      setError('Failed to load configuration');
     } finally {
       setLoading(false);
     }
   };
 
-  const saveSettings = async (updates: { ingestToken?: string; exclusionPatterns?: string[] }) => {
+  const saveConfig = async (updates: {
+    server?: { port?: number };
+    ingest?: { authToken?: string; exclusionPatterns?: string[] };
+    buffer?: { sizeMB?: number };
+  }) => {
     setSaving(true);
+    setError(null);
     try {
-      const response = await fetch('/api/settings', {
+      const response = await fetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
       if (response.ok) {
-        const data: BackendSettings = await response.json();
-        setBackendSettings(data);
-        setExclusionPatterns(data.exclusionPatterns || []);
+        const data: BackendConfig = await response.json();
+        setBackendConfig(data);
+        setServerPort(data.server.port);
+        setBufferSizeMB(data.buffer.sizeMB);
+        setServerDirty(false);
+        setExclusionPatterns(data.ingest.exclusionPatterns || []);
         setExclusionsDirty(false);
-        if (updates.ingestToken !== undefined) {
+        if (updates.ingest?.authToken !== undefined) {
           setAuthToken('');
           setTokenDirty(false);
         }
+      } else {
+        const text = await response.text();
+        setError(text || 'Failed to save configuration');
       }
-    } catch (error) {
-      console.error('Failed to save settings:', error);
+    } catch (err) {
+      console.error('Failed to save config:', err);
+      setError('Failed to save configuration');
     } finally {
       setSaving(false);
     }
@@ -113,13 +145,21 @@ export function Settings({
     onColumnsChange(newColumns);
   };
 
+  // Server settings handlers
+  const handleSaveServerSettings = () => {
+    saveConfig({
+      server: { port: serverPort },
+      buffer: { sizeMB: bufferSizeMB },
+    });
+  };
+
   // Auth token handlers
   const handleSaveToken = () => {
-    saveSettings({ ingestToken: authToken });
+    saveConfig({ ingest: { authToken } });
   };
 
   const handleClearToken = () => {
-    saveSettings({ ingestToken: '' });
+    saveConfig({ ingest: { authToken: '' } });
     setAuthToken('');
     setTokenDirty(false);
   };
@@ -140,14 +180,15 @@ export function Settings({
   };
 
   const handleSaveExclusions = () => {
-    saveSettings({ exclusionPatterns });
+    saveConfig({ ingest: { exclusionPatterns } });
   };
 
   const visibleCount = columns.filter(c => c.visible).length;
 
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'columns', label: 'Columns', icon: <Columns size={16} /> },
-    { id: 'auth', label: 'Ingest Auth', icon: <ShieldCheck size={16} /> },
+    { id: 'server', label: 'Server', icon: <Gear size={16} /> },
+    { id: 'auth', label: 'Auth', icon: <ShieldCheck size={16} /> },
     { id: 'exclusions', label: 'Exclusions', icon: <Funnel size={16} /> },
   ];
 
@@ -164,9 +205,16 @@ export function Settings({
       <Dialog className="p-0 overflow-hidden" size="lg">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
-          <Dialog.Title className="text-xl font-semibold text-kumo-default">
-            Settings
-          </Dialog.Title>
+          <div>
+            <Dialog.Title className="text-xl font-semibold text-kumo-default">
+              Settings
+            </Dialog.Title>
+            {backendConfig?.configFile && (
+              <p className="text-xs text-kumo-inactive mt-1 font-mono">
+                {backendConfig.configFile}
+              </p>
+            )}
+          </div>
           <Dialog.Close
             render={(props) => (
               <Button
@@ -179,6 +227,13 @@ export function Settings({
             )}
           />
         </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="mx-6 mb-2 px-3 py-2 bg-kumo-danger-tint border border-kumo-danger rounded text-sm text-kumo-danger">
+            {error}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex border-b border-kumo-line px-6">
@@ -256,6 +311,75 @@ export function Settings({
                 </div>
               )}
 
+              {/* Server Tab */}
+              {activeTab === 'server' && (
+                <div>
+                  <p className="text-sm text-kumo-subtle mb-4">
+                    Configure server and buffer settings. Changes to port require a server restart.
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-kumo-default mb-2">
+                        Server Port
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={serverPort}
+                        onChange={(e) => {
+                          setServerPort(parseInt(e.target.value) || 8080);
+                          setServerDirty(true);
+                        }}
+                        aria-label="Server port"
+                        className="w-32"
+                      />
+                      <p className="text-xs text-kumo-inactive mt-1">
+                        HTTP server listening port (1-65535). Requires restart.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-kumo-default mb-2">
+                        Buffer Size (MB)
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10000}
+                        value={bufferSizeMB}
+                        onChange={(e) => {
+                          setBufferSizeMB(parseInt(e.target.value) || 100);
+                          setServerDirty(true);
+                        }}
+                        aria-label="Buffer size in megabytes"
+                        className="w-32"
+                      />
+                      <p className="text-xs text-kumo-inactive mt-1">
+                        Maximum memory for log storage. Older logs are evicted when limit is reached. Requires restart.
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleSaveServerSettings}
+                        disabled={!serverDirty || saving}
+                      >
+                        {saving ? 'Saving...' : 'Save Settings'}
+                      </Button>
+                      {serverDirty && (
+                        <span className="text-xs text-kumo-warning self-center">
+                          Unsaved changes (restart required)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Auth Token Tab */}
               {activeTab === 'auth' && (
                 <div>
@@ -278,7 +402,7 @@ export function Settings({
                               setAuthToken(e.target.value);
                               setTokenDirty(true);
                             }}
-                            placeholder={backendSettings?.hasIngestToken ? '(token configured)' : 'Enter token...'}
+                            placeholder={backendConfig?.ingest.hasAuthToken ? '(token configured)' : 'Enter token...'}
                             className="pr-10"
                             aria-label="Authorization token"
                           />
@@ -293,7 +417,7 @@ export function Settings({
                         </div>
                       </div>
                       <p className="text-xs text-kumo-inactive mt-1">
-                        Status: {backendSettings?.hasIngestToken 
+                        Status: {backendConfig?.ingest.hasAuthToken 
                           ? <span className="text-kumo-success">Token configured</span>
                           : <span className="text-kumo-warning">No token (unauthenticated access)</span>
                         }
@@ -309,7 +433,7 @@ export function Settings({
                       >
                         {saving ? 'Saving...' : 'Save Token'}
                       </Button>
-                      {backendSettings?.hasIngestToken && (
+                      {backendConfig?.ingest.hasAuthToken && (
                         <Button
                           variant="outline"
                           size="sm"

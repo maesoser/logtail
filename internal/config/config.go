@@ -3,58 +3,44 @@ package config
 import (
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
-// Config holds application configuration
-type Config struct {
-	Port         int
-	BufferSizeMB int // Buffer size limit in megabytes
-	DevMode      bool
-	IngestToken  string // Authorization token for ingest endpoint (optional)
+// CLIConfig holds command-line only configuration (not persisted)
+type CLIConfig struct {
+	// ConfigFile is the path to the YAML configuration file
+	ConfigFile string
+
+	// DevMode enables development mode (serves frontend from filesystem)
+	DevMode bool
 }
 
-// DefaultConfig returns the default configuration
-func DefaultConfig() *Config {
-	return &Config{
-		Port:         8080,
-		BufferSizeMB: 100, // 100 MB default
-		DevMode:      false,
-		IngestToken:  "",
+// ParseFlags parses command-line flags and returns the CLI configuration
+func ParseFlags() *CLIConfig {
+	cfg := &CLIConfig{}
+
+	// Determine default config file path
+	defaultConfigPath := ""
+	if configDir, err := os.UserConfigDir(); err == nil {
+		defaultConfigPath = filepath.Join(configDir, "logtail", "config.yaml")
 	}
-}
 
-// ParseFlags parses command-line flags and returns the configuration
-func ParseFlags() *Config {
-	cfg := DefaultConfig()
-
-	flag.IntVar(&cfg.Port, "port", cfg.Port, "HTTP server port")
-	flag.IntVar(&cfg.BufferSizeMB, "buffer-size-mb", cfg.BufferSizeMB, "Maximum buffer size in megabytes")
-	flag.BoolVar(&cfg.DevMode, "dev", cfg.DevMode, "Enable development mode (serves frontend from filesystem)")
-	flag.StringVar(&cfg.IngestToken, "ingest-token", cfg.IngestToken, "Authorization token for ingest endpoint (if empty, no auth required)")
+	flag.StringVar(&cfg.ConfigFile, "config", defaultConfigPath, "Path to YAML configuration file")
+	flag.BoolVar(&cfg.DevMode, "dev", false, "Enable development mode (serves frontend from filesystem)")
 
 	flag.Parse()
 
 	return cfg
 }
 
-// BufferSizeBytes returns the buffer size in bytes
-func (c *Config) BufferSizeBytes() int64 {
-	return int64(c.BufferSizeMB) * 1024 * 1024
+// EnsureConfigDir ensures the directory for the config file exists
+func EnsureConfigDir(configPath string) error {
+	dir := filepath.Dir(configPath)
+	return os.MkdirAll(dir, 0755)
 }
 
-// Validate checks if the configuration is valid
-func (c *Config) Validate() error {
-	if c.Port < 1 || c.Port > 65535 {
-		return fmt.Errorf("port must be between 1 and 65535")
-	}
-	if c.BufferSizeMB < 1 {
-		return fmt.Errorf("buffer-size-mb must be at least 1")
-	}
-	return nil
-}
-
-// String returns a string representation of the configuration
-func (c *Config) String() string {
-	hasToken := c.IngestToken != ""
-	return fmt.Sprintf("Config{Port: %d, BufferSizeMB: %d, DevMode: %v, IngestToken: %v}", c.Port, c.BufferSizeMB, c.DevMode, hasToken)
+// String returns a string representation of the CLI configuration
+func (c *CLIConfig) String() string {
+	return fmt.Sprintf("CLIConfig{ConfigFile: %s, DevMode: %v}", c.ConfigFile, c.DevMode)
 }

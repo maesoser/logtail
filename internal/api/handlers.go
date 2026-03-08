@@ -18,17 +18,17 @@ import (
 
 // Handlers contains all HTTP handler functions
 type Handlers struct {
-	Buffer   *buffer.CircularBuffer
-	Hub      *websocket.Hub
-	Settings *models.SettingsStore
+	Buffer *buffer.CircularBuffer
+	Hub    *websocket.Hub
+	Config *models.ConfigStore
 }
 
 // NewHandlers creates a new Handlers instance
-func NewHandlers(buf *buffer.CircularBuffer, hub *websocket.Hub, settings *models.SettingsStore) *Handlers {
+func NewHandlers(buf *buffer.CircularBuffer, hub *websocket.Hub, config *models.ConfigStore) *Handlers {
 	return &Handlers{
-		Buffer:   buf,
-		Hub:      hub,
-		Settings: settings,
+		Buffer: buf,
+		Hub:    hub,
+		Config: config,
 	}
 }
 
@@ -54,7 +54,7 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check authorization if token is configured
-	ingestToken := h.Settings.GetIngestToken()
+	ingestToken := h.Config.GetIngestToken()
 	if ingestToken != "" {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader != ingestToken {
@@ -65,7 +65,7 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get exclusion patterns
-	exclusionPatterns := h.Settings.GetExclusionPatterns()
+	exclusionPatterns := h.Config.GetExclusionPatterns()
 
 	var reader io.Reader = r.Body
 
@@ -279,63 +279,94 @@ func (h *Handlers) SetupWebSocketBroadcast() {
 	})
 }
 
-// SettingsResponse represents the settings returned to the frontend
+// ConfigResponse represents the configuration returned to the frontend
 // Note: We don't expose the actual token value for security, just whether it's set
-type SettingsResponse struct {
-	HasIngestToken    bool     `json:"hasIngestToken"`
-	ExclusionPatterns []string `json:"exclusionPatterns"`
+type ConfigResponse struct {
+	Server struct {
+		Port int `json:"port"`
+	} `json:"server"`
+	Ingest struct {
+		HasAuthToken      bool     `json:"hasAuthToken"`
+		ExclusionPatterns []string `json:"exclusionPatterns"`
+	} `json:"ingest"`
+	Buffer struct {
+		SizeMB int `json:"sizeMB"`
+	} `json:"buffer"`
+	ConfigFile string `json:"configFile"`
 }
 
-// SettingsUpdateRequest represents a settings update request from the frontend
-type SettingsUpdateRequest struct {
-	IngestToken       *string  `json:"ingestToken,omitempty"`
-	ExclusionPatterns []string `json:"exclusionPatterns,omitempty"`
+// ConfigUpdateRequest represents a configuration update request from the frontend
+type ConfigUpdateRequest struct {
+	Server *struct {
+		Port *int `json:"port,omitempty"`
+	} `json:"server,omitempty"`
+	Ingest *struct {
+		AuthToken         *string  `json:"authToken,omitempty"`
+		ExclusionPatterns []string `json:"exclusionPatterns,omitempty"`
+	} `json:"ingest,omitempty"`
+	Buffer *struct {
+		SizeMB *int `json:"sizeMB,omitempty"`
+	} `json:"buffer,omitempty"`
 }
 
-// HandleGetSettings handles GET /api/settings
-func (h *Handlers) HandleGetSettings(w http.ResponseWriter, r *http.Request) {
-	settings := h.Settings.Get()
+// HandleGetConfig handles GET /api/config
+func (h *Handlers) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
+	config := h.Config.Get()
 
-	response := SettingsResponse{
-		HasIngestToken:    settings.IngestToken != "",
-		ExclusionPatterns: settings.ExclusionPatterns,
+	response := ConfigResponse{
+		ConfigFile: h.Config.GetFilePath(),
 	}
+	response.Server.Port = config.Server.Port
+	response.Ingest.HasAuthToken = config.Ingest.AuthToken != ""
+	response.Ingest.ExclusionPatterns = config.Ingest.ExclusionPatterns
+	response.Buffer.SizeMB = config.Buffer.SizeMB
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
-// HandleUpdateSettings handles PUT /api/settings
-func (h *Handlers) HandleUpdateSettings(w http.ResponseWriter, r *http.Request) {
-	var req SettingsUpdateRequest
+// HandleUpdateConfig handles PUT /api/config
+func (h *Handlers) HandleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	var req ConfigUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Get current settings
-	current := h.Settings.Get()
+	// Get current config
+	current := h.Config.Get()
 
 	// Update only the fields that were provided
-	if req.IngestToken != nil {
-		current.IngestToken = *req.IngestToken
+	if req.Server != nil && req.Server.Port != nil {
+		current.Server.Port = *req.Server.Port
 	}
-	if req.ExclusionPatterns != nil {
-		current.ExclusionPatterns = req.ExclusionPatterns
+	if req.Ingest != nil {
+		if req.Ingest.AuthToken != nil {
+			current.Ingest.AuthToken = *req.Ingest.AuthToken
+		}
+		if req.Ingest.ExclusionPatterns != nil {
+			current.Ingest.ExclusionPatterns = req.Ingest.ExclusionPatterns
+		}
+	}
+	if req.Buffer != nil && req.Buffer.SizeMB != nil {
+		current.Buffer.SizeMB = *req.Buffer.SizeMB
 	}
 
-	// Save updated settings
-	if err := h.Settings.Update(current); err != nil {
-		log.Printf("Failed to update settings: %v", err)
-		http.Error(w, "Failed to save settings", http.StatusInternalServerError)
+	// Save updated config
+	if err := h.Config.Update(current); err != nil {
+		log.Printf("Failed to update config: %v", err)
+		http.Error(w, "Failed to save config: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Return updated settings (without exposing token)
-	response := SettingsResponse{
-		HasIngestToken:    current.IngestToken != "",
-		ExclusionPatterns: current.ExclusionPatterns,
+	// Return updated config (without exposing token)
+	response := ConfigResponse{
+		ConfigFile: h.Config.GetFilePath(),
 	}
+	response.Server.Port = current.Server.Port
+	response.Ingest.HasAuthToken = current.Ingest.AuthToken != ""
+	response.Ingest.ExclusionPatterns = current.Ingest.ExclusionPatterns
+	response.Buffer.SizeMB = current.Buffer.SizeMB
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
