@@ -1,0 +1,78 @@
+/* Source directives for Tailwind to scan */
+@source "../node_modules/@cloudflare/kumo/dist/**/*.js";
+
+/* Import Kumo styles */
+@import "@cloudflare/kumo/styles/tailwind";
+
+/* Import Tailwind */
+@import "tailwindcss";
+
+/* Enable class-based dark mode */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Custom theme tokens - these become usable as Tailwind utilities */
+@theme {
+  /* Primary colors */
+  --color-primary: #0066FF;
+  --color-secondary: #FFFFFF;
+  --color-success: #28B47C;
+  --color-error: #E5484D;
+  --color-warning: #F59E0B;
+  
+  /* Text colors */
+  --color-text-main: #212934;
+  
+  /* Border colors */
+  --color-border-subtle: #D1D5DB;
+  
+  /* Background colors */
+  --color-bg-alt: #F9FAFB;
+  --color-bg-white: #FFFFFF;
+}
+
+/* Base styles */
+html, body {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F9FAFB;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1F2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4B5563;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6B7280;
+}
+
+/* Histogram bar hover effect */
+.histogram-bar {
+  transition: opacity 0.15s ease-in-out;
+}
+
+.histogram-bar:hover {
+  opacity: 0.8;
+}

@@ -1,0 +1,24 @@
+# Git
+.git
+.gitignore
+
+# Dependencies
+web/node_modules
+
+# Build outputs (will be built in Docker)
+web/dist
+webtail
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.md
+LICENSE
