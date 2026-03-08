@@ -13,41 +13,56 @@ import (
 const (
 	// DefaultMaxSizeBytes is the default maximum buffer size (100 MB)
 	DefaultMaxSizeBytes = 100 * 1024 * 1024
+	// DefaultReorderWindow is the default time window for reordering out-of-order logs
+	DefaultReorderWindow = 1 * time.Hour
 )
 
 // CircularBuffer is a thread-safe circular buffer for storing log entries
 // limited by total memory usage in bytes.
 type CircularBuffer struct {
-	entries      []models.LogEntry
-	entrySizes   []int // Size of each entry for quick eviction calculation
-	maxSizeBytes int64 // Maximum total size in bytes
-	currentSize  int64 // Current total size in bytes
-	count        int
-	head         int // Points to the next write position
-	tail         int // Points to the oldest entry
-	capacity     int // Current slice capacity
-	mu           sync.RWMutex
-	idSeq        uint64
-	onChange     func(entry models.LogEntry) // Callback for new entries
+	entries       []models.LogEntry
+	entrySizes    []int // Size of each entry for quick eviction calculation
+	maxSizeBytes  int64 // Maximum total size in bytes
+	currentSize   int64 // Current total size in bytes
+	count         int
+	head          int // Points to the next write position
+	tail          int // Points to the oldest entry
+	capacity      int // Current slice capacity
+	mu            sync.RWMutex
+	idSeq         uint64
+	onChange      func(entry models.LogEntry) // Callback for new entries
+	reorderWindow time.Duration               // Time window for reordering out-of-order logs
 }
 
 // New creates a new circular buffer with the specified maximum size in bytes.
 // If maxSizeBytes is <= 0, it defaults to 100 MB.
 func New(maxSizeBytes int64) *CircularBuffer {
+	return NewWithReorderWindow(maxSizeBytes, DefaultReorderWindow)
+}
+
+// NewWithReorderWindow creates a new circular buffer with custom reorder window.
+// The reorder window determines how far back in time we look when inserting
+// out-of-order log entries. Logs within this window will be inserted in
+// timestamp-sorted order; logs older than the window are appended at the end.
+func NewWithReorderWindow(maxSizeBytes int64, reorderWindow time.Duration) *CircularBuffer {
 	if maxSizeBytes <= 0 {
 		maxSizeBytes = DefaultMaxSizeBytes
+	}
+	if reorderWindow < 0 {
+		reorderWindow = DefaultReorderWindow
 	}
 	// Start with a reasonable initial capacity
 	initialCapacity := 10000
 	return &CircularBuffer{
-		entries:      make([]models.LogEntry, initialCapacity),
-		entrySizes:   make([]int, initialCapacity),
-		maxSizeBytes: maxSizeBytes,
-		currentSize:  0,
-		capacity:     initialCapacity,
-		count:        0,
-		head:         0,
-		tail:         0,
+		entries:       make([]models.LogEntry, initialCapacity),
+		entrySizes:    make([]int, initialCapacity),
+		maxSizeBytes:  maxSizeBytes,
+		currentSize:   0,
+		capacity:      initialCapacity,
+		count:         0,
+		head:          0,
+		tail:          0,
+		reorderWindow: reorderWindow,
 	}
 }
 
@@ -58,7 +73,9 @@ func (b *CircularBuffer) SetOnChange(fn func(entry models.LogEntry)) {
 	b.onChange = fn
 }
 
-// Add adds a new log entry to the buffer
+// Add adds a new log entry to the buffer, inserting it in timestamp order
+// within the reorder window. Entries newer than the newest entry or older
+// than the reorder window are appended at the end.
 func (b *CircularBuffer) Add(entry models.LogEntry) models.LogEntry {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -79,14 +96,11 @@ func (b *CircularBuffer) Add(entry models.LogEntry) models.LogEntry {
 		b.grow()
 	}
 
-	// Store the entry and its size
-	b.entries[b.head] = entry
-	b.entrySizes[b.head] = entrySize
-	b.currentSize += int64(entrySize)
+	// Find the correct insertion position based on timestamp
+	insertPos := b.findInsertPosition(entry.Timestamp)
 
-	// Move head forward
-	b.head = (b.head + 1) % b.capacity
-	b.count++
+	// Insert at the calculated position
+	b.insertAt(insertPos, entry, entrySize)
 
 	// Call onChange callback if set
 	if b.onChange != nil {
@@ -130,6 +144,96 @@ func (b *CircularBuffer) grow() {
 	b.tail = 0
 	b.head = b.count
 	b.capacity = newCapacity
+}
+
+// findInsertPosition finds the correct position to insert an entry based on timestamp.
+// It searches within the reorder window using binary search and returns the logical
+// index (0 = oldest, count-1 = newest) where the entry should be inserted.
+// Returns count if the entry should be appended at the end (newest position).
+// Must be called with lock held.
+func (b *CircularBuffer) findInsertPosition(timestamp time.Time) int {
+	if b.count == 0 {
+		return 0
+	}
+
+	// Get the timestamp of the newest entry
+	newestIdx := (b.head - 1 + b.capacity) % b.capacity
+	newestTimestamp := b.entries[newestIdx].Timestamp
+
+	// If the new entry is newer or equal to the newest, append at the end
+	if !timestamp.Before(newestTimestamp) {
+		return b.count
+	}
+
+	// Calculate the cutoff time for the reorder window
+	windowCutoff := time.Now().Add(-b.reorderWindow)
+
+	// If the entry is older than the reorder window, append at the end
+	// (we don't reorder very old entries)
+	if timestamp.Before(windowCutoff) {
+		return b.count
+	}
+
+	// Binary search within recent entries to find the correct position
+	// We search from the end (newest) backwards within the window
+	low := 0
+	high := b.count
+
+	// First, find where the window starts (skip entries older than window)
+	for low < high {
+		mid := (low + high) / 2
+		midIdx := (b.tail + mid) % b.capacity
+		if b.entries[midIdx].Timestamp.Before(windowCutoff) {
+			low = mid + 1
+		} else {
+			high = mid
+		}
+	}
+	windowStart := low
+
+	// Now binary search within the window for the correct position
+	low = windowStart
+	high = b.count
+
+	for low < high {
+		mid := (low + high) / 2
+		midIdx := (b.tail + mid) % b.capacity
+		if b.entries[midIdx].Timestamp.Before(timestamp) {
+			low = mid + 1
+		} else {
+			high = mid
+		}
+	}
+
+	return low
+}
+
+// insertAt inserts an entry at the specified logical position, shifting newer entries.
+// Position is a logical index where 0 = oldest, count = after newest.
+// Must be called with lock held and after ensuring capacity.
+func (b *CircularBuffer) insertAt(pos int, entry models.LogEntry, entrySize int) {
+	if pos >= b.count {
+		// Append at the end (most common case)
+		b.entries[b.head] = entry
+		b.entrySizes[b.head] = entrySize
+		b.head = (b.head + 1) % b.capacity
+	} else {
+		// Need to shift entries from pos to head-1 to make room
+		// Shift right by one position
+		for i := b.count - 1; i >= pos; i-- {
+			srcIdx := (b.tail + i) % b.capacity
+			dstIdx := (b.tail + i + 1) % b.capacity
+			b.entries[dstIdx] = b.entries[srcIdx]
+			b.entrySizes[dstIdx] = b.entrySizes[srcIdx]
+		}
+		// Insert at the position
+		insertIdx := (b.tail + pos) % b.capacity
+		b.entries[insertIdx] = entry
+		b.entrySizes[insertIdx] = entrySize
+		b.head = (b.head + 1) % b.capacity
+	}
+	b.count++
+	b.currentSize += int64(entrySize)
 }
 
 // AddBatch adds multiple log entries to the buffer

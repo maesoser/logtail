@@ -224,3 +224,210 @@ func TestLogEntry_EstimateSize(t *testing.T) {
 		t.Errorf("expected size >= %d, got %d", expectedMin, size)
 	}
 }
+
+func TestCircularBuffer_OutOfOrderInsertion(t *testing.T) {
+	// Create buffer with 1 hour reorder window (default)
+	buf := New(100 * 1024)
+
+	now := time.Now()
+
+	// Insert logs out of order: t+2, t+0, t+1
+	entries := []struct {
+		offset  time.Duration
+		content string
+	}{
+		{2 * time.Minute, "message at t+2"},
+		{0, "message at t+0"},
+		{1 * time.Minute, "message at t+1"},
+	}
+
+	for _, e := range entries {
+		buf.Add(models.LogEntry{
+			Client:    "test",
+			Timestamp: now.Add(e.offset),
+			Content:   e.content,
+		})
+	}
+
+	// Query all entries - they should be in timestamp order
+	result := buf.Query(models.LogFilter{})
+	if result.TotalCount != 3 {
+		t.Fatalf("expected 3 entries, got %d", result.TotalCount)
+	}
+
+	// Results are returned newest-first by Query, so reverse order expected
+	// Entry 0 should be newest (t+2), Entry 2 should be oldest (t+0)
+	if result.Entries[0].Content != "message at t+2" {
+		t.Errorf("expected newest entry to be 't+2', got '%s'", result.Entries[0].Content)
+	}
+	if result.Entries[1].Content != "message at t+1" {
+		t.Errorf("expected middle entry to be 't+1', got '%s'", result.Entries[1].Content)
+	}
+	if result.Entries[2].Content != "message at t+0" {
+		t.Errorf("expected oldest entry to be 't+0', got '%s'", result.Entries[2].Content)
+	}
+}
+
+func TestCircularBuffer_OutOfOrderInsertionMultiple(t *testing.T) {
+	buf := New(100 * 1024)
+
+	now := time.Now()
+
+	// Insert 10 logs in random order
+	offsets := []int{5, 2, 8, 1, 9, 3, 7, 0, 6, 4}
+
+	for _, offset := range offsets {
+		buf.Add(models.LogEntry{
+			Client:    "test",
+			Timestamp: now.Add(time.Duration(offset) * time.Minute),
+			Content:   string(rune('0' + offset)), // "0", "1", "2", etc.
+		})
+	}
+
+	// Query all entries
+	result := buf.Query(models.LogFilter{})
+	if result.TotalCount != 10 {
+		t.Fatalf("expected 10 entries, got %d", result.TotalCount)
+	}
+
+	// Results should be in descending timestamp order (newest first)
+	for i := 0; i < 10; i++ {
+		expected := string(rune('0' + (9 - i))) // "9", "8", "7", ...
+		if result.Entries[i].Content != expected {
+			t.Errorf("entry %d: expected content '%s', got '%s'", i, expected, result.Entries[i].Content)
+		}
+	}
+}
+
+func TestCircularBuffer_OutOfOrderBeyondWindow(t *testing.T) {
+	// Create buffer with 30-minute reorder window
+	buf := NewWithReorderWindow(100*1024, 30*time.Minute)
+
+	now := time.Now()
+
+	// Add an entry at "now"
+	buf.Add(models.LogEntry{
+		Client:    "test",
+		Timestamp: now,
+		Content:   "current",
+	})
+
+	// Add an entry 20 minutes ago (within window) - should be reordered
+	buf.Add(models.LogEntry{
+		Client:    "test",
+		Timestamp: now.Add(-20 * time.Minute),
+		Content:   "20min-ago",
+	})
+
+	// Add an entry 2 hours ago (outside window) - should NOT be reordered
+	buf.Add(models.LogEntry{
+		Client:    "test",
+		Timestamp: now.Add(-2 * time.Hour),
+		Content:   "2hours-ago",
+	})
+
+	result := buf.Query(models.LogFilter{})
+	if result.TotalCount != 3 {
+		t.Fatalf("expected 3 entries, got %d", result.TotalCount)
+	}
+
+	// Newest should be "current", then "2hours-ago" (appended, not reordered),
+	// then "20min-ago" (reordered to its correct position)
+	// Actually, let's verify the actual positions:
+	// Buffer order after insertions:
+	// 1. Add "current" at now -> buffer: [current]
+	// 2. Add "20min-ago" -> within window, inserted before "current" -> buffer: [20min-ago, current]
+	// 3. Add "2hours-ago" -> outside window, appended -> buffer: [20min-ago, current, 2hours-ago]
+	// Query returns newest-first by iteration order (head to tail)
+
+	// The "2hours-ago" was appended at head, so it appears newest in query
+	if result.Entries[0].Content != "2hours-ago" {
+		t.Errorf("expected newest entry to be '2hours-ago' (appended), got '%s'", result.Entries[0].Content)
+	}
+	if result.Entries[1].Content != "current" {
+		t.Errorf("expected middle entry to be 'current', got '%s'", result.Entries[1].Content)
+	}
+	if result.Entries[2].Content != "20min-ago" {
+		t.Errorf("expected oldest entry to be '20min-ago', got '%s'", result.Entries[2].Content)
+	}
+}
+
+func TestCircularBuffer_ReorderWindowZero(t *testing.T) {
+	// With zero reorder window, no reordering should happen
+	buf := NewWithReorderWindow(100*1024, 0)
+
+	now := time.Now()
+
+	// Insert out of order
+	buf.Add(models.LogEntry{Timestamp: now.Add(2 * time.Minute), Content: "t+2"})
+	buf.Add(models.LogEntry{Timestamp: now, Content: "t+0"})
+	buf.Add(models.LogEntry{Timestamp: now.Add(1 * time.Minute), Content: "t+1"})
+
+	result := buf.Query(models.LogFilter{})
+
+	// Should be in insertion order (no reordering with zero window)
+	// Query returns newest-first (by buffer position), so last inserted first
+	if result.Entries[0].Content != "t+1" {
+		t.Errorf("expected first entry 't+1', got '%s'", result.Entries[0].Content)
+	}
+	if result.Entries[1].Content != "t+0" {
+		t.Errorf("expected second entry 't+0', got '%s'", result.Entries[1].Content)
+	}
+	if result.Entries[2].Content != "t+2" {
+		t.Errorf("expected third entry 't+2', got '%s'", result.Entries[2].Content)
+	}
+}
+
+func TestCircularBuffer_OrderedInsertionWithEviction(t *testing.T) {
+	// Create a small buffer that will need to evict
+	buf := NewWithReorderWindow(1024, 1*time.Hour)
+
+	now := time.Now()
+
+	// Add entries until we trigger eviction
+	for i := 0; i < 20; i++ {
+		buf.Add(models.LogEntry{
+			Client:    "test",
+			Timestamp: now.Add(time.Duration(i) * time.Second),
+			Content:   "message with some content to take up space in the buffer",
+		})
+	}
+
+	// Buffer should have evicted some entries
+	if buf.Count() >= 20 {
+		t.Errorf("expected some entries to be evicted, count is %d", buf.Count())
+	}
+
+	// Remaining entries should still be in timestamp order
+	result := buf.Query(models.LogFilter{})
+	for i := 0; i < len(result.Entries)-1; i++ {
+		current := result.Entries[i].Timestamp
+		next := result.Entries[i+1].Timestamp
+		// Query returns newest-first, so current should be >= next
+		if current.Before(next) {
+			t.Errorf("entries not in order: entry %d (%v) before entry %d (%v)",
+				i, current, i+1, next)
+		}
+	}
+}
+
+func TestNewWithReorderWindow(t *testing.T) {
+	tests := []struct {
+		name          string
+		reorderWindow time.Duration
+		wantWindow    time.Duration
+	}{
+		{"positive window", 30 * time.Minute, 30 * time.Minute},
+		{"zero window", 0, 0},
+		{"negative uses default", -1 * time.Hour, DefaultReorderWindow},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := NewWithReorderWindow(1024, tt.reorderWindow)
+			if buf.reorderWindow != tt.wantWindow {
+				t.Errorf("expected reorder window %v, got %v", tt.wantWindow, buf.reorderWindow)
+			}
+		})
+	}
+}
