@@ -25,6 +25,8 @@ interface BackendConfig {
   };
   buffer: {
     sizeMB: number;
+    persistPath: string;
+    autoSaveMinutes: number;
   };
   configFile: string;
 }
@@ -54,6 +56,8 @@ export function Settings({
   // Server settings state
   const [serverPort, setServerPort] = useState(8080);
   const [bufferSizeMB, setBufferSizeMB] = useState(100);
+  const [persistPath, setPersistPath] = useState('');
+  const [autoSaveMinutes, setAutoSaveMinutes] = useState(0);
   const [serverDirty, setServerDirty] = useState(false);
   
   // Auth token state
@@ -83,6 +87,8 @@ export function Settings({
         setBackendConfig(data);
         setServerPort(data.server.port);
         setBufferSizeMB(data.buffer.sizeMB);
+        setPersistPath(data.buffer.persistPath || '');
+        setAutoSaveMinutes(data.buffer.autoSaveMinutes || 0);
         setServerDirty(false);
         setExclusionPatterns(data.ingest.exclusionPatterns || []);
         setExclusionsDirty(false);
@@ -101,7 +107,7 @@ export function Settings({
   const saveConfig = async (updates: {
     server?: { port?: number };
     ingest?: { authToken?: string; exclusionPatterns?: string[] };
-    buffer?: { sizeMB?: number };
+    buffer?: { sizeMB?: number; persistPath?: string; autoSaveMinutes?: number };
   }) => {
     setSaving(true);
     setError(null);
@@ -116,6 +122,8 @@ export function Settings({
         setBackendConfig(data);
         setServerPort(data.server.port);
         setBufferSizeMB(data.buffer.sizeMB);
+        setPersistPath(data.buffer.persistPath || '');
+        setAutoSaveMinutes(data.buffer.autoSaveMinutes || 0);
         setServerDirty(false);
         setExclusionPatterns(data.ingest.exclusionPatterns || []);
         setExclusionsDirty(false);
@@ -160,7 +168,11 @@ export function Settings({
   const handleSaveServerSettings = () => {
     saveConfig({
       server: { port: serverPort },
-      buffer: { sizeMB: bufferSizeMB },
+      buffer: { 
+        sizeMB: bufferSizeMB,
+        persistPath: persistPath,
+        autoSaveMinutes: autoSaveMinutes,
+      },
     });
   };
 
@@ -370,6 +382,53 @@ export function Settings({
                       <p className="text-xs text-kumo-inactive mt-1">
                         Maximum memory for log storage. Older logs are evicted when limit is reached. Requires restart.
                       </p>
+                    </div>
+
+                    <div className="border-t border-kumo-line pt-4 mt-4">
+                      <h4 className="text-sm font-medium text-kumo-default mb-3">Buffer Persistence</h4>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-kumo-default mb-2">
+                            Persistence File Path
+                          </label>
+                          <Input
+                            type="text"
+                            value={persistPath}
+                            onChange={(e) => {
+                              setPersistPath(e.target.value);
+                              setServerDirty(true);
+                            }}
+                            placeholder="e.g., ~/.config/logtail/buffer.dat"
+                            aria-label="Persistence file path"
+                            className="w-full"
+                          />
+                          <p className="text-xs text-kumo-inactive mt-1">
+                            File path to save buffer on shutdown and restore on startup. Leave empty to disable persistence.
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-kumo-default mb-2">
+                            Auto-Save Interval (minutes)
+                          </label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={1440}
+                            value={autoSaveMinutes}
+                            onChange={(e) => {
+                              setAutoSaveMinutes(parseInt(e.target.value) || 0);
+                              setServerDirty(true);
+                            }}
+                            aria-label="Auto-save interval in minutes"
+                            className="w-32"
+                          />
+                          <p className="text-xs text-kumo-inactive mt-1">
+                            Periodically save buffer to disk. Set to 0 to disable (only saves on shutdown). Requires restart.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                     
                     <div className="flex gap-2">

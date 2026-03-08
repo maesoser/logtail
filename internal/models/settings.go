@@ -40,6 +40,14 @@ type IngestConfig struct {
 type BufferConfig struct {
 	// SizeMB is the maximum buffer size in megabytes
 	SizeMB int `yaml:"size_mb" json:"sizeMB"`
+
+	// PersistPath is the file path for buffer persistence
+	// If empty, persistence is disabled
+	PersistPath string `yaml:"persist_path,omitempty" json:"persistPath"`
+
+	// AutoSaveMinutes is the interval in minutes for periodic auto-save
+	// If 0 or negative, auto-save is disabled (only saves on shutdown)
+	AutoSaveMinutes int `yaml:"auto_save_minutes,omitempty" json:"autoSaveMinutes"`
 }
 
 // DefaultConfig returns the default configuration
@@ -125,7 +133,9 @@ func (s *ConfigStore) Get() Config {
 			ExclusionPatterns: append([]string{}, s.config.Ingest.ExclusionPatterns...),
 		},
 		Buffer: BufferConfig{
-			SizeMB: s.config.Buffer.SizeMB,
+			SizeMB:          s.config.Buffer.SizeMB,
+			PersistPath:     s.config.Buffer.PersistPath,
+			AutoSaveMinutes: s.config.Buffer.AutoSaveMinutes,
 		},
 	}
 }
@@ -149,7 +159,9 @@ func (s *ConfigStore) Update(config Config) error {
 			ExclusionPatterns: append([]string{}, config.Ingest.ExclusionPatterns...),
 		},
 		Buffer: BufferConfig{
-			SizeMB: config.Buffer.SizeMB,
+			SizeMB:          config.Buffer.SizeMB,
+			PersistPath:     config.Buffer.PersistPath,
+			AutoSaveMinutes: config.Buffer.AutoSaveMinutes,
 		},
 	}
 
@@ -197,6 +209,20 @@ func (s *ConfigStore) GetExclusionPatterns() []string {
 // GetFilePath returns the config file path
 func (s *ConfigStore) GetFilePath() string {
 	return s.filePath
+}
+
+// GetPersistPath returns the buffer persistence file path
+func (s *ConfigStore) GetPersistPath() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.config.Buffer.PersistPath
+}
+
+// GetAutoSaveMinutes returns the auto-save interval in minutes
+func (s *ConfigStore) GetAutoSaveMinutes() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.config.Buffer.AutoSaveMinutes
 }
 
 // loadFromFile loads configuration from the YAML file

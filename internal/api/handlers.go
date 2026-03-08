@@ -322,7 +322,9 @@ type ConfigResponse struct {
 		ExclusionPatterns []string `json:"exclusionPatterns"`
 	} `json:"ingest"`
 	Buffer struct {
-		SizeMB int `json:"sizeMB"`
+		SizeMB          int    `json:"sizeMB"`
+		PersistPath     string `json:"persistPath"`
+		AutoSaveMinutes int    `json:"autoSaveMinutes"`
 	} `json:"buffer"`
 	ConfigFile string `json:"configFile"`
 }
@@ -337,7 +339,9 @@ type ConfigUpdateRequest struct {
 		ExclusionPatterns []string `json:"exclusionPatterns,omitempty"`
 	} `json:"ingest,omitempty"`
 	Buffer *struct {
-		SizeMB *int `json:"sizeMB,omitempty"`
+		SizeMB          *int    `json:"sizeMB,omitempty"`
+		PersistPath     *string `json:"persistPath,omitempty"`
+		AutoSaveMinutes *int    `json:"autoSaveMinutes,omitempty"`
 	} `json:"buffer,omitempty"`
 }
 
@@ -352,6 +356,8 @@ func (h *Handlers) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 	response.Ingest.HasAuthToken = config.Ingest.AuthToken != ""
 	response.Ingest.ExclusionPatterns = config.Ingest.ExclusionPatterns
 	response.Buffer.SizeMB = config.Buffer.SizeMB
+	response.Buffer.PersistPath = config.Buffer.PersistPath
+	response.Buffer.AutoSaveMinutes = config.Buffer.AutoSaveMinutes
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -380,8 +386,16 @@ func (h *Handlers) HandleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 			current.Ingest.ExclusionPatterns = req.Ingest.ExclusionPatterns
 		}
 	}
-	if req.Buffer != nil && req.Buffer.SizeMB != nil {
-		current.Buffer.SizeMB = *req.Buffer.SizeMB
+	if req.Buffer != nil {
+		if req.Buffer.SizeMB != nil {
+			current.Buffer.SizeMB = *req.Buffer.SizeMB
+		}
+		if req.Buffer.PersistPath != nil {
+			current.Buffer.PersistPath = *req.Buffer.PersistPath
+		}
+		if req.Buffer.AutoSaveMinutes != nil {
+			current.Buffer.AutoSaveMinutes = *req.Buffer.AutoSaveMinutes
+		}
 	}
 
 	// Save updated config
@@ -399,6 +413,8 @@ func (h *Handlers) HandleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	response.Ingest.HasAuthToken = current.Ingest.AuthToken != ""
 	response.Ingest.ExclusionPatterns = current.Ingest.ExclusionPatterns
 	response.Buffer.SizeMB = current.Buffer.SizeMB
+	response.Buffer.PersistPath = current.Buffer.PersistPath
+	response.Buffer.AutoSaveMinutes = current.Buffer.AutoSaveMinutes
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
