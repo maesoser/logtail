@@ -111,12 +111,12 @@ func TestCircularBuffer_Query(t *testing.T) {
 	}
 
 	// Query with client filter
-	result = buf.Query(models.LogFilter{Client: "client-a"})
+	result = buf.Query(models.LogFilter{Client: []string{"client-a"}})
 	if result.TotalCount != 5 {
 		t.Errorf("expected 5 entries for client-a, got %d", result.TotalCount)
 	}
 
-	result = buf.Query(models.LogFilter{Client: "client-b"})
+	result = buf.Query(models.LogFilter{Client: []string{"client-b"}})
 	if result.TotalCount != 0 {
 		t.Errorf("expected 0 entries for client-b, got %d", result.TotalCount)
 	}

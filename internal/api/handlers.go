@@ -155,27 +155,40 @@ func shouldExclude(content string, patterns []string) bool {
 	return false
 }
 
+// filterEmptyStrings returns a slice with empty strings removed
+func filterEmptyStrings(s []string) []string {
+	if len(s) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(s))
+	for _, v := range s {
+		if v != "" {
+			result = append(result, v)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
 // HandleGetLogs handles GET /api/logs with filtering and pagination
 func (h *Handlers) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
 	filter := models.LogFilter{
-		Client:   query.Get("client"),
-		Hostname: query.Get("hostname"),
-		Tag:      query.Get("tag"),
+		Client:   filterEmptyStrings(query["client"]),
+		Hostname: filterEmptyStrings(query["hostname"]),
+		Tag:      filterEmptyStrings(query["tag"]),
 		Content:  query.Get("content"),
 	}
 
-	// Parse severity filter (comma-separated list of levels 0-7)
+	// Parse severity filter (multiple values supported)
 	if severityStr := query.Get("severity"); severityStr != "" {
-		severities := []int{}
 		for _, s := range query["severity"] {
 			if level, err := strconv.Atoi(s); err == nil && level >= 0 && level <= 7 {
-				severities = append(severities, level)
+				filter.Severity = append(filter.Severity, level)
 			}
-		}
-		if len(severities) > 0 {
-			filter.Severity = severities
 		}
 	}
 
@@ -220,21 +233,36 @@ func (h *Handlers) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
-	// Parse optional severity filter for histogram filtering
-	var filter *models.LogFilter
+	// Parse all filter parameters for histogram filtering
+	filter := models.LogFilter{
+		Client:   filterEmptyStrings(query["client"]),
+		Hostname: filterEmptyStrings(query["hostname"]),
+		Tag:      filterEmptyStrings(query["tag"]),
+		Content:  query.Get("content"),
+	}
+
+	// Parse severity filter (multiple values supported)
 	if severityStr := query.Get("severity"); severityStr != "" {
-		severities := []int{}
 		for _, s := range query["severity"] {
 			if level, err := strconv.Atoi(s); err == nil && level >= 0 && level <= 7 {
-				severities = append(severities, level)
+				filter.Severity = append(filter.Severity, level)
 			}
-		}
-		if len(severities) > 0 {
-			filter = &models.LogFilter{Severity: severities}
 		}
 	}
 
-	stats := h.Buffer.GetStats(filter)
+	// Parse time range
+	if fromStr := query.Get("from"); fromStr != "" {
+		if from, err := time.Parse(time.RFC3339, fromStr); err == nil {
+			filter.From = &from
+		}
+	}
+	if toStr := query.Get("to"); toStr != "" {
+		if to, err := time.Parse(time.RFC3339, toStr); err == nil {
+			filter.To = &to
+		}
+	}
+
+	stats := h.Buffer.GetStats(&filter)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)

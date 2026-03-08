@@ -41,7 +41,7 @@ function App() {
   
   // Fetch data
   const { data: logsData, loading: logsLoading, refetch: refetchLogs } = useLogs(filter);
-  const { stats, refetch: refetchStats } = useStats(10000, { severity: filter.severity });
+  const { stats, refetch: refetchStats } = useStats(10000, filter);
   
   // Fetch unique values for filter dropdowns
   const { values: uniqueClients } = useUniqueValues('client');

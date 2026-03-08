@@ -200,19 +200,46 @@ func (b *CircularBuffer) Query(filter models.LogFilter) models.LogQueryResult {
 
 // matchesFilter checks if an entry matches the given filter
 func (b *CircularBuffer) matchesFilter(entry models.LogEntry, filter models.LogFilter) bool {
-	// Filter by client
-	if filter.Client != "" && !strings.EqualFold(entry.Client, filter.Client) {
-		return false
+	// Filter by client (OR logic - match any of the specified clients)
+	if len(filter.Client) > 0 {
+		found := false
+		for _, c := range filter.Client {
+			if strings.EqualFold(entry.Client, c) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
 	}
 
-	// Filter by hostname
-	if filter.Hostname != "" && !strings.EqualFold(entry.Hostname, filter.Hostname) {
-		return false
+	// Filter by hostname (OR logic - match any of the specified hostnames)
+	if len(filter.Hostname) > 0 {
+		found := false
+		for _, h := range filter.Hostname {
+			if strings.EqualFold(entry.Hostname, h) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
 	}
 
-	// Filter by tag
-	if filter.Tag != "" && !strings.EqualFold(entry.Tag, filter.Tag) {
-		return false
+	// Filter by tag (OR logic - match any of the specified tags)
+	if len(filter.Tag) > 0 {
+		found := false
+		for _, t := range filter.Tag {
+			if strings.EqualFold(entry.Tag, t) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
 	}
 
 	// Filter by content (substring, case-insensitive)
@@ -220,7 +247,7 @@ func (b *CircularBuffer) matchesFilter(entry models.LogEntry, filter models.LogF
 		return false
 	}
 
-	// Filter by severity levels
+	// Filter by severity levels (OR logic - match any of the specified levels)
 	if len(filter.Severity) > 0 {
 		found := false
 		for _, s := range filter.Severity {
@@ -252,8 +279,8 @@ type severityBucket struct {
 }
 
 // GetStats returns buffer statistics including histogram data
-// If filter is provided and has severity levels set, the histogram will only
-// include entries matching those severity levels
+// If filter is provided, the histogram will only include entries matching
+// all filter criteria (client, hostname, tag, content, severity, time range)
 func (b *CircularBuffer) GetStats(filter *models.LogFilter) models.Stats {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -276,14 +303,10 @@ func (b *CircularBuffer) GetStats(filter *models.LogFilter) models.Stats {
 	// Find oldest and newest timestamps and build histogram
 	var oldest, newest *time.Time
 
-	// Build a set of allowed severities for quick lookup
-	var allowedSeverities map[int]bool
-	if filter != nil && len(filter.Severity) > 0 {
-		allowedSeverities = make(map[int]bool)
-		for _, s := range filter.Severity {
-			allowedSeverities[s] = true
-		}
-	}
+	// Check if we have any filter criteria
+	hasFilter := filter != nil && (len(filter.Client) > 0 || len(filter.Hostname) > 0 ||
+		len(filter.Tag) > 0 || filter.Content != "" || len(filter.Severity) > 0 ||
+		filter.From != nil || filter.To != nil)
 
 	for i := 0; i < b.count; i++ {
 		idx := (b.tail + i) % b.capacity
@@ -299,8 +322,8 @@ func (b *CircularBuffer) GetStats(filter *models.LogFilter) models.Stats {
 			newest = &ts
 		}
 
-		// If severity filter is set, skip entries that don't match
-		if allowedSeverities != nil && !allowedSeverities[entry.Severity] {
+		// Apply full filter matching if filter is provided
+		if hasFilter && !b.matchesFilter(entry, *filter) {
 			continue
 		}
 

@@ -138,11 +138,11 @@ func (p *IngestPayload) ToLogEntry(id uint64) (*LogEntry, error) {
 
 // LogFilter contains filtering parameters for querying logs
 type LogFilter struct {
-	Client   string
-	Hostname string
-	Tag      string
-	Content  string // Substring search
-	Severity []int  // Filter by severity levels (0-7)
+	Client   []string // Filter by client names (OR logic)
+	Hostname []string // Filter by hostnames (OR logic)
+	Tag      []string // Filter by tags (OR logic)
+	Content  string   // Substring search
+	Severity []int    // Filter by severity levels (0-7)
 	From     *time.Time
 	To       *time.Time
 	Page     int
