@@ -1,31 +1,34 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Stats, LogFilter } from '../types';
+import type { Stats, LogFilter, TimeRange } from '../types';
 
 const API_BASE = '';
 
-export function useStats(refreshInterval = 30000, filter?: LogFilter) {
+export function useStats(refreshInterval = 30000, filter?: LogFilter, timeRange: TimeRange = '24h') {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Memoize filter to prevent unnecessary refetches
   const filterKey = useMemo(() => {
-    if (!filter) return '';
-    const parts: string[] = [];
-    if (filter.client?.length) parts.push(`c:${filter.client.sort().join(',')}`);
-    if (filter.hostname?.length) parts.push(`h:${filter.hostname.sort().join(',')}`);
-    if (filter.tag?.length) parts.push(`t:${filter.tag.sort().join(',')}`);
-    if (filter.content) parts.push(`q:${filter.content}`);
-    if (filter.severity?.length) parts.push(`s:${filter.severity.sort().join(',')}`);
-    if (filter.from) parts.push(`f:${filter.from}`);
-    if (filter.to) parts.push(`e:${filter.to}`);
+    const parts: string[] = [`r:${timeRange}`];
+    if (filter?.client?.length) parts.push(`c:${filter.client.sort().join(',')}`);
+    if (filter?.hostname?.length) parts.push(`h:${filter.hostname.sort().join(',')}`);
+    if (filter?.tag?.length) parts.push(`t:${filter.tag.sort().join(',')}`);
+    if (filter?.content) parts.push(`q:${filter.content}`);
+    if (filter?.severity?.length) parts.push(`s:${filter.severity.sort().join(',')}`);
+    if (filter?.from) parts.push(`f:${filter.from}`);
+    if (filter?.to) parts.push(`e:${filter.to}`);
     return parts.join('|');
-  }, [filter]);
+  }, [filter, timeRange]);
 
   const fetchStats = useCallback(async () => {
     try {
       // Build URL with all filter parameters
       const params = new URLSearchParams();
+      
+      // Add time range parameter
+      params.append('range', timeRange);
+      
       if (filter?.client?.length) {
         filter.client.forEach(c => params.append('client', c));
       }
@@ -48,9 +51,7 @@ export function useStats(refreshInterval = 30000, filter?: LogFilter) {
         params.append('to', filter.to);
       }
       
-      const url = params.toString() 
-        ? `${API_BASE}/api/stats?${params.toString()}`
-        : `${API_BASE}/api/stats`;
+      const url = `${API_BASE}/api/stats?${params.toString()}`;
 
       const response = await fetch(url);
       if (!response.ok) {
@@ -65,7 +66,7 @@ export function useStats(refreshInterval = 30000, filter?: LogFilter) {
     } finally {
       setLoading(false);
     }
-  }, [filterKey]);
+  }, [filterKey, timeRange]);
 
   useEffect(() => {
     fetchStats();

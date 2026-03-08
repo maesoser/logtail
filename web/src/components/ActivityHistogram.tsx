@@ -1,11 +1,14 @@
 import { useMemo } from 'react';
-import { LayerCard } from '@cloudflare/kumo';
+import { LayerCard, Tabs } from '@cloudflare/kumo';
 import { Popover } from '@cloudflare/kumo/primitives/popover';
-import type { HistogramBucket, SeverityCounts } from '../types';
-import { SEVERITY_LEVELS } from '../types';
+import type { HistogramBucket, SeverityCounts, TimeRange } from '../types';
+import { SEVERITY_LEVELS, TIME_RANGE_CONFIGS, VALID_TIME_RANGES } from '../types';
 
 interface ActivityHistogramProps {
   data: HistogramBucket[];
+  bucketMinutes: number;
+  timeRange: TimeRange;
+  onTimeRangeChange: (range: TimeRange) => void;
   height?: number;
 }
 
@@ -27,18 +30,41 @@ const SEVERITY_NAME_TO_LEVEL: Record<keyof SeverityCounts, number> = {
   debug: 7,
 };
 
-// Helper to compute the next 15-minute interval end time
-function getIntervalEnd(hour: string): string {
+// Helper to compute the interval end time based on bucket size
+function getIntervalEnd(hour: string, bucketMinutes: number): string {
   const [h, m] = hour.split(':').map(Number);
-  const endMinutes = m + 15;
-  if (endMinutes >= 60) {
-    const nextHour = (h + 1) % 24;
-    return `${nextHour.toString().padStart(2, '0')}:${(endMinutes - 60).toString().padStart(2, '0')}`;
-  }
-  return `${h.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
+  const endMinutes = m + bucketMinutes;
+  const totalMinutes = h * 60 + endMinutes;
+  const newHour = Math.floor(totalMinutes / 60) % 24;
+  const newMinute = totalMinutes % 60;
+  return `${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`;
 }
 
-export function ActivityHistogram({ data, height = 80 }: ActivityHistogramProps) {
+// Time range tabs configuration
+const TIME_RANGE_TABS = VALID_TIME_RANGES.map(range => ({
+  value: range,
+  label: TIME_RANGE_CONFIGS[range].label,
+}));
+
+// Format bucket size for display
+function formatBucketSize(minutes: number): string {
+  if (minutes >= 60) {
+    const hours = minutes / 60;
+    return `${hours}hr`;
+  }
+  return `${minutes}min`;
+}
+
+// Format time range label for the legend
+function formatTimeRangeLabel(range: TimeRange): string {
+  switch (range) {
+    case '8h': return '8h ago';
+    case '24h': return '24h ago';
+    case '5d': return '5d ago';
+  }
+}
+
+export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeChange, height = 80 }: ActivityHistogramProps) {
   const { maxCount, bars } = useMemo(() => {
     const max = Math.max(...data.map(b => b.count), 1);
     const barsData = data.map((bucket, index) => ({
@@ -54,11 +80,14 @@ export function ActivityHistogram({ data, height = 80 }: ActivityHistogramProps)
   return (
     <LayerCard>
       <LayerCard.Secondary className="flex items-center justify-between">
-        <span className="text-sm font-semibold">
-          24-Hour Activity
-        </span>
+        <Tabs
+          variant="segmented"
+          tabs={TIME_RANGE_TABS}
+          value={timeRange}
+          onValueChange={(v) => onTimeRangeChange(v as TimeRange)}
+        />
         <span className="text-xs text-kumo-subtle">
-          Peak: {maxCount.toLocaleString()} logs/15min
+          Peak: {maxCount.toLocaleString()} logs/{formatBucketSize(bucketMinutes)}
         </span>
       </LayerCard.Secondary>
       
@@ -111,7 +140,7 @@ export function ActivityHistogram({ data, height = 80 }: ActivityHistogramProps)
                 }))
               : [];
 
-            const intervalEnd = getIntervalEnd(bar.hour);
+            const intervalEnd = getIntervalEnd(bar.hour, bucketMinutes);
             
             return (
               <Popover.Root key={bar.index}>
@@ -192,7 +221,7 @@ export function ActivityHistogram({ data, height = 80 }: ActivityHistogramProps)
           })}
         </div>
         <div className="text-xs text-kumo-subtle">
-          <span>24h ago</span>
+          <span>{formatTimeRangeLabel(timeRange)}</span>
           <span className="mx-2">→</span>
           <span>Now</span>
         </div>

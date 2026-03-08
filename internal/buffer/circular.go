@@ -385,23 +385,26 @@ type severityBucket struct {
 // GetStats returns buffer statistics including histogram data
 // If filter is provided, the histogram will only include entries matching
 // all filter criteria (client, hostname, tag, content, severity, time range)
-func (b *CircularBuffer) GetStats(filter *models.LogFilter) models.Stats {
+// The histConfig parameter controls the time range and bucket size
+func (b *CircularBuffer) GetStats(filter *models.LogFilter, histConfig models.HistogramConfig) models.Stats {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	// 96 buckets of 15 minutes each = 24 hours total
-	const numBuckets = 96
-	const bucketMinutes = 15
+	bucketMinutes := histConfig.BucketMinutes
+	numBuckets := histConfig.TotalMinutes / bucketMinutes
 
 	stats := models.Stats{
 		TotalEntries:    b.count,
 		BufferSizeBytes: b.maxSizeBytes,
 		UsedSizeBytes:   b.currentSize,
 		Histogram:       make([]models.HistogramBucket, numBuckets),
+		BucketMinutes:   bucketMinutes,
 	}
 
-	// Initialize histogram buckets for the last 24 hours (15-min intervals)
+	// Get current time and align to exact bucket boundary
+	// For 10-min buckets: 10:23 -> 10:20, for 15-min: 10:23 -> 10:15, for 60-min: 10:23 -> 10:00
 	now := time.Now().UTC()
+	alignedNow := alignToBucket(now, bucketMinutes)
 	intervalBuckets := make(map[int]*severityBucket) // interval offset -> bucket data
 
 	// Find oldest and newest timestamps and build histogram
@@ -431,8 +434,10 @@ func (b *CircularBuffer) GetStats(filter *models.LogFilter) models.Stats {
 			continue
 		}
 
-		// Calculate 15-minute intervals ago (for histogram)
-		minutesAgo := int(now.Sub(entry.Timestamp).Minutes())
+		// Calculate which bucket this entry belongs to based on aligned time
+		// Entry at 10:23 with alignedNow at 10:20 and 10-min buckets -> bucket 0
+		// Entry at 10:13 with alignedNow at 10:20 and 10-min buckets -> bucket 1
+		minutesAgo := int(alignedNow.Sub(entry.Timestamp).Minutes())
 		intervalsAgo := minutesAgo / bucketMinutes
 		if intervalsAgo >= 0 && intervalsAgo < numBuckets {
 			if intervalBuckets[intervalsAgo] == nil {
@@ -449,9 +454,9 @@ func (b *CircularBuffer) GetStats(filter *models.LogFilter) models.Stats {
 	stats.OldestTimestamp = oldest
 	stats.NewestTimestamp = newest
 
-	// Build histogram array (index 0 = current interval, index 95 = oldest interval)
+	// Build histogram array (index 0 = current interval, index numBuckets-1 = oldest interval)
 	for i := 0; i < numBuckets; i++ {
-		intervalTime := now.Add(-time.Duration(i*bucketMinutes) * time.Minute)
+		intervalTime := alignedNow.Add(-time.Duration(i*bucketMinutes) * time.Minute)
 		bucket := intervalBuckets[i]
 		histBucket := models.HistogramBucket{
 			Hour: intervalTime.Format("15:04"),
@@ -478,6 +483,16 @@ func (b *CircularBuffer) GetStats(filter *models.LogFilter) models.Stats {
 	}
 
 	return stats
+}
+
+// alignToBucket rounds a time down to the nearest bucket boundary
+// For bucketMinutes=10: 10:23 -> 10:20, 10:30 -> 10:30
+// For bucketMinutes=15: 10:23 -> 10:15, 10:45 -> 10:45
+// For bucketMinutes=60: 10:23 -> 10:00, 11:59 -> 11:00
+func alignToBucket(t time.Time, bucketMinutes int) time.Time {
+	minutes := t.Hour()*60 + t.Minute()
+	alignedMinutes := (minutes / bucketMinutes) * bucketMinutes
+	return time.Date(t.Year(), t.Month(), t.Day(), alignedMinutes/60, alignedMinutes%60, 0, 0, t.Location())
 }
 
 // MaxSizeBytes returns the configured maximum buffer size in bytes

@@ -185,6 +185,35 @@ type Stats struct {
 	OldestTimestamp *time.Time        `json:"oldestTimestamp,omitempty"`
 	NewestTimestamp *time.Time        `json:"newestTimestamp,omitempty"`
 	Histogram       []HistogramBucket `json:"histogram"`
+	BucketMinutes   int               `json:"bucketMinutes"` // Size of each histogram bucket in minutes
+}
+
+// HistogramConfig defines the time range and bucket size for histogram generation
+type HistogramConfig struct {
+	TotalMinutes  int // Total time range in minutes
+	BucketMinutes int // Size of each bucket in minutes
+}
+
+// Predefined histogram configurations
+var (
+	// HistogramConfig8h: 8 hours in 10-minute buckets (48 buckets)
+	HistogramConfig8h = HistogramConfig{TotalMinutes: 8 * 60, BucketMinutes: 10}
+	// HistogramConfig24h: 24 hours in 15-minute buckets (96 buckets)
+	HistogramConfig24h = HistogramConfig{TotalMinutes: 24 * 60, BucketMinutes: 15}
+	// HistogramConfig5d: 5 days in 1-hour buckets (120 buckets)
+	HistogramConfig5d = HistogramConfig{TotalMinutes: 5 * 24 * 60, BucketMinutes: 60}
+)
+
+// GetHistogramConfig returns the appropriate configuration for the given range
+func GetHistogramConfig(rangeStr string) HistogramConfig {
+	switch rangeStr {
+	case "8h":
+		return HistogramConfig8h
+	case "5d":
+		return HistogramConfig5d
+	default:
+		return HistogramConfig24h
+	}
 }
 
 // WebSocketMessage represents a message sent over WebSocket

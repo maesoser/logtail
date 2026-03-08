@@ -230,6 +230,7 @@ func (h *Handlers) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleGetStats handles GET /api/stats
+// Accepts optional "range" query parameter: "8h", "24h", or "5d" (default: "24h")
 func (h *Handlers) HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
@@ -262,7 +263,10 @@ func (h *Handlers) HandleGetStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	stats := h.Buffer.GetStats(&filter)
+	// Parse histogram range preset (8h, 24h, 5d) - default to 24h
+	histConfig := models.GetHistogramConfig(query.Get("range"))
+
+	stats := h.Buffer.GetStats(&filter, histConfig)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)

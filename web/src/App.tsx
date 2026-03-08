@@ -12,6 +12,7 @@ import { useDarkMode } from './hooks/useDarkMode';
 import { usePersistedColumns } from './hooks/usePersistedColumns';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useUrlState } from './hooks/useUrlState';
+import { useTimeRangeUrlState } from './hooks/useTimeRangeUrlState';
 import { ActivityHistogram, ActivityHistogramCompact } from './components/ActivityHistogram';
 import { FilterPanel } from './components/FilterPanel';
 import { LogTable } from './components/LogTable';
@@ -29,6 +30,9 @@ function App() {
   // Filter state (synced with URL)
   const [filter, setFilter] = useUrlState();
   
+  // Time range state (synced with URL)
+  const [timeRange, setTimeRange] = useTimeRangeUrlState();
+  
   // Column configuration (persisted to localStorage)
   const { columns, setColumns, resetColumns } = usePersistedColumns();
   
@@ -41,7 +45,7 @@ function App() {
   
   // Fetch data
   const { data: logsData, loading: logsLoading, refetch: refetchLogs } = useLogs(filter);
-  const { stats, refetch: refetchStats } = useStats(10000, filter);
+  const { stats, refetch: refetchStats } = useStats(10000, filter, timeRange);
   
   // Fetch unique values for filter dropdowns
   const { values: uniqueClients } = useUniqueValues('client');
@@ -186,7 +190,12 @@ function App() {
               <ActivityHistogramCompact data={stats.histogram} />
             </div>
           ) : (
-            <ActivityHistogram data={stats.histogram} />
+            <ActivityHistogram 
+              data={stats.histogram}
+              bucketMinutes={stats.bucketMinutes}
+              timeRange={timeRange}
+              onTimeRangeChange={setTimeRange}
+            />
           )
         )}
 

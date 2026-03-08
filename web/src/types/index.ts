@@ -60,6 +60,33 @@ export interface Stats {
   oldestTimestamp: string | null;
   newestTimestamp: string | null;
   histogram: HistogramBucket[];
+  bucketMinutes: number;    // Size of each histogram bucket in minutes
+}
+
+// Time range options for the histogram
+export type TimeRange = '8h' | '24h' | '5d';
+
+// Time range configuration
+export interface TimeRangeConfig {
+  value: TimeRange;
+  label: string;
+  bucketMinutes: number;
+  description: string;
+}
+
+// Predefined time range configurations
+export const TIME_RANGE_CONFIGS: Record<TimeRange, TimeRangeConfig> = {
+  '8h': { value: '8h', label: '8 Hours', bucketMinutes: 10, description: '10-min buckets' },
+  '24h': { value: '24h', label: '24 Hours', bucketMinutes: 15, description: '15-min buckets' },
+  '5d': { value: '5d', label: '5 Days', bucketMinutes: 60, description: '1-hour buckets' },
+};
+
+// Valid time range values for validation
+export const VALID_TIME_RANGES: TimeRange[] = ['8h', '24h', '5d'];
+
+// Check if a string is a valid time range
+export function isValidTimeRange(value: string): value is TimeRange {
+  return VALID_TIME_RANGES.includes(value as TimeRange);
 }
 
 // WebSocket message types
