@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Input, Button, DatePicker, Popover, Badge, Text, Select, Combobox } from '@cloudflare/kumo';
-import { MagnifyingGlass, X, CalendarDots, Funnel, Database, Clock, WifiHigh, WifiSlash } from '@phosphor-icons/react';
+import { MagnifyingGlassIcon, X, CalendarDotsIcon, FunnelIcon, DatabaseIcon, ClockIcon, WifiHighIcon, WifiSlashIcon } from '@phosphor-icons/react';
 import type { LogFilter, Stats } from '../types';
 import { SEVERITY_LEVELS, formatRelativeTime } from '../types';
 
@@ -127,7 +127,7 @@ export function FilterPanel({
       <div className={`flex gap-2 md:gap-3 ${isMobile ? 'flex-col' : 'items-center'}`}>
         <div className={`flex gap-2 ${isMobile ? 'w-full' : 'flex-1'}`}>
           <div className="flex-1 relative">
-            <MagnifyingGlass 
+            <MagnifyingGlassIcon
               className="absolute left-3 top-1/2 -translate-y-1/2 text-kumo-subtle" 
               size={16} 
             />
@@ -147,7 +147,7 @@ export function FilterPanel({
             aria-label="Filters"
             className="flex items-center gap-2"
           >
-            <Funnel size={16} />
+            <FunnelIcon size={16} />
             {!isMobile && 'Filters'}
             {hasActiveFilters && (
               <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
@@ -173,7 +173,7 @@ export function FilterPanel({
         {/* Stats section - right aligned on desktop, full width on mobile */}
         <div className={`flex items-center gap-3 md:gap-4 text-xs ${isMobile ? 'justify-between' : 'ml-auto'}`}>
           <div className="flex items-center gap-1.5">
-            <Database size={14} className="text-kumo-subtle" />
+            <DatabaseIcon size={14} className="text-kumo-subtle" />
             <Text variant="secondary">
               {stats?.totalEntries?.toLocaleString() ?? 0}{!isMobile && ` / ${stats?.bufferSizeBytes?.toLocaleString() ?? 0}`}
             </Text>
@@ -181,7 +181,7 @@ export function FilterPanel({
           
           {stats?.oldestTimestamp && !isMobile && (
             <div className="flex items-center gap-1.5">
-              <Clock size={14} className="text-kumo-subtle" />
+              <ClockIcon size={14} className="text-kumo-subtle" />
               <Text variant="secondary">
                 {formatRelativeTime(stats.oldestTimestamp)}
               </Text>
@@ -190,9 +190,9 @@ export function FilterPanel({
           
           <div className="flex items-center gap-1.5">
             {connected ? (
-              <WifiHigh size={14} className="text-kumo-success" />
+              <WifiHighIcon size={14} className="text-kumo-success" />
             ) : (
-              <WifiSlash size={14} className="text-kumo-subtle" />
+              <WifiSlashIcon size={14} className="text-kumo-subtle" />
             )}
             <Badge variant={connected ? 'primary' : 'secondary'} className="text-xs">
               {connected ? 'Live' : 'Offline'}
@@ -352,7 +352,7 @@ export function FilterPanel({
                 <Popover.Title className="text-kumo-default">Date Range</Popover.Title>
                 <Popover.Trigger asChild>
                   <Button variant="outline" className="w-full justify-start">
-                    <CalendarDots size={16} className="mr-2" />
+                    <CalendarDotsIcon size={16} className="mr-2" />
                     {formatDateRange()}
                   </Button>
                 </Popover.Trigger>

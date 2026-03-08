@@ -1,0 +1,8 @@
+server:
+    port: 8080
+ingest:
+    auth_token: ""
+    exclusion_patterns:
+        - Exit before auth from
+buffer:
+    size_mb: 128

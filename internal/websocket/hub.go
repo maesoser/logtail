@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/webtail/webtail/internal/models"
+	"github.com/logtail/logtail/internal/models"
 )
 
 var upgrader = websocket.Upgrader{

@@ -1,6 +1,6 @@
 # Go
 build/
-webtail
+logtail
 *.exe
 *.exe~
 *.dll

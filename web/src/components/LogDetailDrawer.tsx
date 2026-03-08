@@ -2,12 +2,12 @@ import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import { Button } from '@cloudflare/kumo';
 import { DrawerPreview as Drawer } from '@cloudflare/kumo/primitives/drawer';
 import { 
-  X, 
-  CaretLeft, 
-  CaretRight, 
-  Copy, 
-  Funnel,
-  CheckCircle 
+  XIcon, 
+  CaretLeftIcon, 
+  CaretRightIcon, 
+  CopyIcon, 
+  FunnelIcon,
+  CheckCircleIcon 
 } from '@phosphor-icons/react';
 import type { LogEntry, LogFilter } from '../types';
 import { getSeverityInfo, formatTimestamp, formatRelativeTime } from '../types';
@@ -231,7 +231,7 @@ export function LogDetailDrawer({
                 disabled={!canNavigatePrev}
                 aria-label="Previous entry (k)"
               >
-                <CaretLeft size={16} />
+                <CaretLeftIcon size={16} />
               </Button>
               <Button
                 variant="ghost"
@@ -241,7 +241,7 @@ export function LogDetailDrawer({
                 disabled={!canNavigateNext}
                 aria-label="Next entry (j)"
               >
-                <CaretRight size={16} />
+                <CaretRightIcon size={16} />
               </Button>
               
               <div className="w-px h-4 bg-kumo-line mx-1" />
@@ -255,7 +255,7 @@ export function LogDetailDrawer({
                     size="sm"
                     aria-label="Close drawer"
                   >
-                    <X size={16} />
+                    <XIcon size={16} />
                   </Button>
                 )}
               />
@@ -341,12 +341,12 @@ export function LogDetailDrawer({
                   >
                     {copiedContent ? (
                       <>
-                        <CheckCircle size={14} className="text-kumo-success" />
+                        <CheckCircleIcon size={14} className="text-kumo-success" />
                         Copied!
                       </>
                     ) : (
                       <>
-                        <Copy size={14} />
+                        <CopyIcon size={14} />
                         Copy
                       </>
                     )}
@@ -359,12 +359,12 @@ export function LogDetailDrawer({
                   >
                     {copiedJson ? (
                       <>
-                        <CheckCircle size={14} className="text-kumo-success" />
+                        <CheckCircleIcon size={14} className="text-kumo-success" />
                         Copied!
                       </>
                     ) : (
                       <>
-                        <Copy size={14} />
+                        <CopyIcon size={14} />
                         Copy as JSON
                       </>
                     )}
@@ -398,7 +398,7 @@ export function LogDetailDrawer({
                   onOpenChange(false);
                 }}
               >
-                <Funnel size={12} className="mr-1" />
+                <FunnelIcon size={12} className="mr-1" />
                 This host
               </Button>
               <Button
@@ -410,7 +410,7 @@ export function LogDetailDrawer({
                   onOpenChange(false);
                 }}
               >
-                <Funnel size={12} className="mr-1" />
+                <FunnelIcon size={12} className="mr-1" />
                 This tag
               </Button>
               <Button
@@ -422,7 +422,7 @@ export function LogDetailDrawer({
                   onOpenChange(false);
                 }}
               >
-                <Funnel size={12} className="mr-1" />
+                <FunnelIcon size={12} className="mr-1" />
                 This severity
               </Button>
             </div>
@@ -462,7 +462,7 @@ function MetadataItem({
           className="text-xs opacity-0 group-hover:opacity-100 hover:opacity-100"
           aria-label={`Filter by ${label}`}
         >
-          <Funnel size={12} />
+          <FunnelIcon size={12} />
         </Button>
       )}
     </div>

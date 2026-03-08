@@ -1,4 +1,4 @@
-package webtail
+package logtail
 
 import "embed"
 

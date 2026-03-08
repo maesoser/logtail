@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/webtail/webtail/internal/models"
+	"github.com/logtail/logtail/internal/models"
 )
 
 func TestNew(t *testing.T) {

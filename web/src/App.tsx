@@ -1,10 +1,10 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@cloudflare/kumo';
 import { 
-  Lightning, 
-  ArrowClockwise,
-  Sun,
-  Moon
+  LightningIcon, 
+  ArrowClockwiseIcon,
+  SunIcon,
+  MoonIcon
 } from '@phosphor-icons/react';
 import { useLogs, useWebSocket } from './hooks/useLogs';
 import { useStats, useUniqueValues } from './hooks/useStats';
@@ -135,9 +135,9 @@ function App() {
         <div className="mx-auto px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 md:gap-3">
-              <Lightning size={isMobile ? 24 : 28} weight="fill" className="text-kumo-brand" />
+              <LightningIcon size={isMobile ? 24 : 28} weight="fill" className="text-kumo-brand" />
               <h1 className="text-lg md:text-xl font-semibold text-kumo-default">
-                logtail
+                Logtail
               </h1>
             </div>
             
@@ -150,7 +150,7 @@ function App() {
                 aria-label="Refresh"
                 className="flex items-center gap-2"
               >
-                <ArrowClockwise size={16} />
+                <ArrowClockwiseIcon size={16} />
                 {!isMobile && 'Refresh'}
               </Button>
               
@@ -170,7 +170,7 @@ function App() {
                 onClick={toggleDarkMode}
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               >
-                {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                {isDark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
               </Button>
             </div>
           </div>

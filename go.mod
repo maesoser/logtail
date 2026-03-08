@@ -1,4 +1,4 @@
-module github.com/webtail/webtail
+module github.com/logtail/logtail
 
 go 1.25.0
 

@@ -1,11 +1,11 @@
-# Webtail - Agent Guidelines
+# Logtail - Agent Guidelines
 
 High-performance log ingestion and visualization application with Go backend and React frontend.
 
 ## Project Structure
 
 ```
-cmd/webtail/          # Application entry point
+cmd/logtail/          # Application entry point
 internal/
   api/                # HTTP handlers, router, middleware (chi router)
   buffer/             # Thread-safe circular buffer
@@ -25,9 +25,9 @@ embed.go              # Go embed for SPA assets
 ### Backend (Go)
 
 ```bash
-go build -o webtail ./cmd/webtail           # Build
-./webtail                                    # Run (default port 8080)
-./webtail -port 9000 -buffer-size 50000     # Custom config
+go build -o logtail ./cmd/logtail           # Build
+./logtail                                    # Run (default port 8080)
+./logtail -port 9000 -buffer-size 50000     # Custom config
 
 go test ./...                                # All tests
 go test ./internal/buffer/...               # Single package
@@ -51,7 +51,7 @@ npx tsc --noEmit            # Type check
 
 ```bash
 # Terminal 1: Backend with dev mode
-go run ./cmd/webtail -dev
+go run ./cmd/logtail -dev
 
 # Terminal 2: Frontend dev server
 cd web && npm run dev
@@ -64,8 +64,8 @@ cd web && npm run dev
 ### Docker
 
 ```bash
-docker build -t webtail .
-docker run -p 8080:8080 webtail
+docker build -t logtail .
+docker run -p 8080:8080 logtail
 ```
 
 ## Code Style Guidelines

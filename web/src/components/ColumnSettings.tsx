@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Dialog, Checkbox, Button } from '@cloudflare/kumo';
-import { GearSix, X } from '@phosphor-icons/react';
+import { GearSixIcon, XIcon } from '@phosphor-icons/react';
 import type { ColumnConfig } from '../types';
 
 interface ColumnSettingsProps {
@@ -44,7 +44,7 @@ export function ColumnSettings({
       <Dialog.Trigger 
         render={(props) => (
           <Button {...props} variant="outline" className="flex items-center gap-2">
-            <GearSix size={16} />
+            <GearSixIcon size={16} />
             Columns ({visibleCount})
           </Button>
         )}
@@ -61,7 +61,7 @@ export function ColumnSettings({
                 aria-label="Close"
                 variant="secondary"
                 shape="square"
-                icon={<X size={16} />}
+                icon={<XIcon size={16} />}
               />
             )}
           />

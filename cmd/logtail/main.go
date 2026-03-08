@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	webtail "github.com/webtail/webtail"
-	"github.com/webtail/webtail/internal/api"
-	"github.com/webtail/webtail/internal/buffer"
-	"github.com/webtail/webtail/internal/config"
-	"github.com/webtail/webtail/internal/models"
-	"github.com/webtail/webtail/internal/websocket"
+	logtail "github.com/logtail/logtail"
+	"github.com/logtail/logtail/internal/api"
+	"github.com/logtail/logtail/internal/buffer"
+	"github.com/logtail/logtail/internal/config"
+	"github.com/logtail/logtail/internal/models"
+	"github.com/logtail/logtail/internal/websocket"
 )
 
 func main() {
@@ -53,7 +53,7 @@ func main() {
 	log.Printf("WebSocket hub started")
 
 	// Create router
-	router := api.NewRouter(buf, hub, webtail.WebAssets, cliCfg.DevMode, configStore)
+	router := api.NewRouter(buf, hub, logtail.WebAssets, cliCfg.DevMode, configStore)
 
 	// Create HTTP server
 	server := &http.Server{

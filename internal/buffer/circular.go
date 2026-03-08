@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/webtail/webtail/internal/models"
+	"github.com/logtail/logtail/internal/models"
 )
 
 const (

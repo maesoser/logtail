@@ -19,7 +19,7 @@ COPY . .
 # Copy built frontend assets
 COPY --from=frontend /app/web/dist ./web/dist
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o webtail ./cmd/webtail
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o logtail ./cmd/logtail
 
 # Stage 3: Runtime
 FROM alpine:3.20
@@ -27,15 +27,15 @@ FROM alpine:3.20
 RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 # Copy the binary
-COPY --from=backend /app/webtail /usr/local/bin/webtail
+COPY --from=backend /app/logtail /usr/local/bin/logtail
 # Create non-root user
-RUN adduser -D -g '' webtail
-USER webtail
+RUN adduser -D -g '' logtail
+USER logtail
 # Expose port
 EXPOSE 8080
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 # Run
-ENTRYPOINT ["webtail"]
+ENTRYPOINT ["logtail"]
 CMD ["-port", "8080", "-buffer-size", "10000"]

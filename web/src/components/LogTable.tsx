@@ -1,6 +1,6 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { Table, Pagination, Empty, Loader } from '@cloudflare/kumo';
-import { ListDashes, DotsSixVertical } from '@phosphor-icons/react';
+import { ListDashesIcon, DotsSixVerticalIcon } from '@phosphor-icons/react';
 import type { LogEntry, ColumnConfig } from '../types';
 import { getSeverityInfo, formatTimestamp } from '../types';
 import { HighlightedText } from './HighlightedText';
@@ -239,7 +239,7 @@ export function LogTable({
   if (!loading && entries.length === 0) {
     return (
       <Empty
-        icon={<ListDashes size={48} className="text-kumo-subtle" />}
+        icon={<ListDashesIcon size={48} className="text-kumo-subtle" />}
         title="No logs found"
         description="Try adjusting your filters or wait for new log entries."
       />
@@ -287,7 +287,7 @@ export function LogTable({
                     >
                       <div className="flex items-center gap-1">
                         {!isContentCol && (
-                          <DotsSixVertical 
+                          <DotsSixVerticalIcon
                             size={12} 
                             className="text-kumo-subtle opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" 
                           />

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/webtail/webtail/internal/buffer"
-	"github.com/webtail/webtail/internal/models"
-	"github.com/webtail/webtail/internal/websocket"
+	"github.com/logtail/logtail/internal/buffer"
+	"github.com/logtail/logtail/internal/models"
+	"github.com/logtail/logtail/internal/websocket"
 )
 
 // Handlers contains all HTTP handler functions

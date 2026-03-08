@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, Checkbox, Button, Input } from '@cloudflare/kumo';
-import { GearSix, X, Plus, Trash, Eye, EyeSlash, ShieldCheck, Columns, Funnel, Gear } from '@phosphor-icons/react';
+import { 
+  GearSixIcon, 
+  XIcon, 
+  PlusIcon, 
+  TrashIcon, 
+  EyeIcon, 
+  EyeSlashIcon, 
+  ShieldCheckIcon, 
+  ColumnsIcon,
+  FunnelIcon, 
+  GearIcon
+} from '@phosphor-icons/react';
 import type { ColumnConfig } from '../types';
 
 // Config from the backend
@@ -186,10 +197,10 @@ export function Settings({
   const visibleCount = columns.filter(c => c.visible).length;
 
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
-    { id: 'columns', label: 'Columns', icon: <Columns size={16} /> },
-    { id: 'server', label: 'Server', icon: <Gear size={16} /> },
-    { id: 'auth', label: 'Auth', icon: <ShieldCheck size={16} /> },
-    { id: 'exclusions', label: 'Exclusions', icon: <Funnel size={16} /> },
+    { id: 'columns', label: 'Columns', icon: <ColumnsIcon size={16} /> },
+    { id: 'server', label: 'Server', icon: <GearIcon size={16} /> },
+    { id: 'auth', label: 'Auth', icon: <ShieldCheckIcon size={16} /> },
+    { id: 'exclusions', label: 'Exclusions', icon: <FunnelIcon size={16} /> },
   ];
 
   return (
@@ -197,7 +208,7 @@ export function Settings({
       <Dialog.Trigger
         render={(props) => (
           <Button {...props} variant="outline" className="flex items-center gap-2">
-            <GearSix size={16} />
+            <GearSixIcon size={16} />
             Settings
           </Button>
         )}
@@ -222,7 +233,7 @@ export function Settings({
                 aria-label="Close"
                 variant="secondary"
                 shape="square"
-                icon={<X size={16} />}
+                icon={<XIcon size={16} />}
               />
             )}
           />
@@ -412,7 +423,7 @@ export function Settings({
                             className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-kumo-subtle hover:text-kumo-default"
                             aria-label={showToken ? 'Hide token' : 'Show token'}
                           >
-                            {showToken ? <EyeSlash size={16} /> : <Eye size={16} />}
+                            {showToken ? <EyeSlashIcon size={16} /> : <EyeIcon size={16} />}
                           </button>
                         </div>
                       </div>
@@ -482,7 +493,7 @@ export function Settings({
                           disabled={!newPattern.trim()}
                           aria-label="Add pattern"
                         >
-                          <Plus size={16} />
+                          <PlusIcon size={16} />
                         </Button>
                       </div>
                     </div>
@@ -514,7 +525,7 @@ export function Settings({
                                 aria-label={`Remove pattern "${pattern}"`}
                                 className="text-kumo-danger hover:bg-kumo-danger-tint"
                               >
-                                <Trash size={14} />
+                                <TrashIcon size={14} />
                               </Button>
                             </li>
                           ))}

@@ -1,4 +1,4 @@
-# Webtail Makefile
+# Logtail Makefile
 # Build targets for macos-arm64 and linux-arm64
 
 BINARY_NAME := logtail
@@ -90,7 +90,7 @@ $(BUILD_DIR):
 # Help
 .PHONY: help
 help:
-	@echo "Webtail Build Targets:"
+	@echo "Logtail Build Targets:"
 	@echo ""
 	@echo "  make              - Build for current platform"
 	@echo "  make build-all    - Build for all target platforms"

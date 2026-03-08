@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Webtail Log Simulator
-# Generates realistic log entries and sends them to the webtail server
+# Logtail Log Simulator
+# Generates realistic log entries and sends them to the logtail server
 
 set -e
 
@@ -175,12 +175,12 @@ send_logs() {
 
 print_usage() {
     cat <<EOF
-Webtail Log Simulator
+Logtail Log Simulator
 
 Usage: $0 [OPTIONS]
 
 Options:
-    -u, --url URL       Webtail server URL (default: http://localhost:8080)
+    -u, --url URL       Logtail server URL (default: http://localhost:8080)
     -i, --interval SEC  Seconds between batches (default: 1)
     -b, --batch SIZE    Number of logs per batch (default: 5)
     -d, --duration SEC  Duration to run in seconds, 0=forever (default: 0)
@@ -201,7 +201,7 @@ Examples:
     $0 -n 100
 
     # Send logs to a different server every 2 seconds
-    $0 -u http://webtail.example.com:8080 -i 2
+    $0 -u http://logtail.example.com:8080 -i 2
 
     # Run for 60 seconds with large batches
     $0 -d 60 -b 20
@@ -247,7 +247,7 @@ done
 
 # Main execution
 echo "=========================================="
-echo "  Webtail Log Simulator"
+echo "  Logtail Log Simulator"
 echo "=========================================="
 echo "Server URL:    $WEBTAIL_URL"
 echo "Batch size:    $BATCH_SIZE logs"
@@ -266,7 +266,7 @@ echo ""
 echo "Checking server connectivity..."
 if ! curl -s --connect-timeout 5 "${WEBTAIL_URL}/health" > /dev/null 2>&1; then
     echo "ERROR: Cannot connect to ${WEBTAIL_URL}"
-    echo "Make sure the webtail server is running."
+    echo "Make sure the logtail server is running."
     exit 1
 fi
 echo "Server is reachable!"

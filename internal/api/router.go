@@ -11,9 +11,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/webtail/webtail/internal/buffer"
-	"github.com/webtail/webtail/internal/models"
-	"github.com/webtail/webtail/internal/websocket"
+	"github.com/logtail/logtail/internal/buffer"
+	"github.com/logtail/logtail/internal/models"
+	"github.com/logtail/logtail/internal/websocket"
 )
 
 // NewRouter creates and configures the chi router
@@ -75,9 +75,9 @@ func NewRouter(buf *buffer.CircularBuffer, hub *websocket.Hub, webAssets embed.F
 				w.Header().Set("Content-Type", "text/html")
 				w.Write([]byte(`<!DOCTYPE html>
 <html>
-<head><title>Webtail</title></head>
+<head><title>Logtail</title></head>
 <body>
-<h1>Webtail</h1>
+<h1>Logtail</h1>
 <p>Frontend assets not found. Please build the frontend first.</p>
 <p>Run: <code>cd web && npm install && npm run build</code></p>
 </body>
