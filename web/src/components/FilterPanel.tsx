@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Input, Button, DatePicker, Popover, Badge, Text, Select, Combobox } from '@cloudflare/kumo';
-import { MagnifyingGlassIcon, X, CalendarDotsIcon, FunnelIcon, DatabaseIcon, ClockIcon, WifiHighIcon, WifiSlashIcon } from '@phosphor-icons/react';
+import { MagnifyingGlassIcon, XIcon, CalendarDotsIcon, FunnelIcon, DatabaseIcon, ClockIcon, WifiHighIcon, WifiSlashIcon } from '@phosphor-icons/react';
 import type { LogFilter, Stats } from '../types';
 import { SEVERITY_LEVELS, formatRelativeTime } from '../types';
 
@@ -121,6 +121,14 @@ export function FilterPanel({
     return 'Select dates';
   };
 
+  const used = stats?.usedSizeBytes ?? 0;
+  const total = stats?.bufferSizeBytes ?? 0;
+
+  // Avoid division by zero and format to 1 decimal place
+  const usagePercentage = total > 0 
+  ? ((used / total) * 100).toFixed(1) 
+  : 0;
+
   return (
     <div className="bg-kumo-elevated border border-kumo-line rounded p-3">
       {/* Main search bar with stats */}
@@ -164,7 +172,7 @@ export function FilterPanel({
               aria-label="Clear filters"
               className="text-kumo-subtle"
             >
-              <X size={16} />
+              <XIcon size={16} />
               {!isMobile && 'Clear'}
             </Button>
           )}
@@ -175,7 +183,7 @@ export function FilterPanel({
           <div className="flex items-center gap-1.5">
             <DatabaseIcon size={14} className="text-kumo-subtle" />
             <Text variant="secondary">
-              {stats?.totalEntries?.toLocaleString() ?? 0}{!isMobile && ` / ${stats?.bufferSizeBytes?.toLocaleString() ?? 0}`}
+              {stats?.totalEntries?.toLocaleString() ?? 0}{!isMobile && ` / ${usagePercentage}%`}
             </Text>
           </div>
           

@@ -323,6 +323,7 @@ type ConfigResponse struct {
 	} `json:"ingest"`
 	Buffer struct {
 		SizeMB          int    `json:"sizeMB"`
+		RetentionDays   int    `json:"retentionDays"`
 		PersistPath     string `json:"persistPath"`
 		AutoSaveMinutes int    `json:"autoSaveMinutes"`
 	} `json:"buffer"`
@@ -340,6 +341,7 @@ type ConfigUpdateRequest struct {
 	} `json:"ingest,omitempty"`
 	Buffer *struct {
 		SizeMB          *int    `json:"sizeMB,omitempty"`
+		RetentionDays   *int    `json:"retentionDays,omitempty"`
 		PersistPath     *string `json:"persistPath,omitempty"`
 		AutoSaveMinutes *int    `json:"autoSaveMinutes,omitempty"`
 	} `json:"buffer,omitempty"`
@@ -356,6 +358,7 @@ func (h *Handlers) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 	response.Ingest.HasAuthToken = config.Ingest.AuthToken != ""
 	response.Ingest.ExclusionPatterns = config.Ingest.ExclusionPatterns
 	response.Buffer.SizeMB = config.Buffer.SizeMB
+	response.Buffer.RetentionDays = config.Buffer.RetentionDays
 	response.Buffer.PersistPath = config.Buffer.PersistPath
 	response.Buffer.AutoSaveMinutes = config.Buffer.AutoSaveMinutes
 
@@ -390,6 +393,9 @@ func (h *Handlers) HandleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if req.Buffer.SizeMB != nil {
 			current.Buffer.SizeMB = *req.Buffer.SizeMB
 		}
+		if req.Buffer.RetentionDays != nil {
+			current.Buffer.RetentionDays = *req.Buffer.RetentionDays
+		}
 		if req.Buffer.PersistPath != nil {
 			current.Buffer.PersistPath = *req.Buffer.PersistPath
 		}
@@ -413,6 +419,7 @@ func (h *Handlers) HandleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	response.Ingest.HasAuthToken = current.Ingest.AuthToken != ""
 	response.Ingest.ExclusionPatterns = current.Ingest.ExclusionPatterns
 	response.Buffer.SizeMB = current.Buffer.SizeMB
+	response.Buffer.RetentionDays = current.Buffer.RetentionDays
 	response.Buffer.PersistPath = current.Buffer.PersistPath
 	response.Buffer.AutoSaveMinutes = current.Buffer.AutoSaveMinutes
 

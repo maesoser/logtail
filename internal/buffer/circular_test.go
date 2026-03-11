@@ -431,3 +431,191 @@ func TestNewWithReorderWindow(t *testing.T) {
 		})
 	}
 }
+
+func TestNewWithOptions(t *testing.T) {
+	tests := []struct {
+		name              string
+		maxSizeBytes      int64
+		reorderWindow     time.Duration
+		retentionDuration time.Duration
+		wantSize          int64
+		wantReorder       time.Duration
+		wantRetention     time.Duration
+	}{
+		{
+			name:              "all valid values",
+			maxSizeBytes:      1024 * 1024,
+			reorderWindow:     30 * time.Minute,
+			retentionDuration: 7 * 24 * time.Hour,
+			wantSize:          1024 * 1024,
+			wantReorder:       30 * time.Minute,
+			wantRetention:     7 * 24 * time.Hour,
+		},
+		{
+			name:              "zero retention disables it",
+			maxSizeBytes:      1024,
+			reorderWindow:     time.Hour,
+			retentionDuration: 0,
+			wantSize:          1024,
+			wantReorder:       time.Hour,
+			wantRetention:     0,
+		},
+		{
+			name:              "negative retention becomes zero",
+			maxSizeBytes:      1024,
+			reorderWindow:     time.Hour,
+			retentionDuration: -24 * time.Hour,
+			wantSize:          1024,
+			wantReorder:       time.Hour,
+			wantRetention:     0,
+		},
+		{
+			name:              "defaults for invalid size and reorder",
+			maxSizeBytes:      0,
+			reorderWindow:     -1,
+			retentionDuration: 24 * time.Hour,
+			wantSize:          DefaultMaxSizeBytes,
+			wantReorder:       DefaultReorderWindow,
+			wantRetention:     24 * time.Hour,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := NewWithOptions(tt.maxSizeBytes, tt.reorderWindow, tt.retentionDuration)
+			if buf.MaxSizeBytes() != tt.wantSize {
+				t.Errorf("expected max size %d, got %d", tt.wantSize, buf.MaxSizeBytes())
+			}
+			if buf.reorderWindow != tt.wantReorder {
+				t.Errorf("expected reorder window %v, got %v", tt.wantReorder, buf.reorderWindow)
+			}
+			if buf.retentionDuration != tt.wantRetention {
+				t.Errorf("expected retention duration %v, got %v", tt.wantRetention, buf.retentionDuration)
+			}
+		})
+	}
+}
+
+func TestCircularBuffer_TimeBasedEviction(t *testing.T) {
+	// Create buffer with 1-hour retention
+	retentionDuration := 1 * time.Hour
+	buf := NewWithOptions(100*1024*1024, DefaultReorderWindow, retentionDuration)
+
+	now := time.Now()
+
+	// Add entries with different timestamps
+	entries := []struct {
+		age      time.Duration
+		shouldBe string // "evicted" or "kept"
+	}{
+		{age: 2 * time.Hour, shouldBe: "evicted"},    // older than retention
+		{age: 90 * time.Minute, shouldBe: "evicted"}, // older than retention
+		{age: 30 * time.Minute, shouldBe: "kept"},    // within retention
+		{age: 10 * time.Minute, shouldBe: "kept"},    // within retention
+		{age: 0, shouldBe: "kept"},                   // current time
+	}
+
+	for i, e := range entries {
+		buf.Add(models.LogEntry{
+			Client:    "test",
+			Hostname:  "host",
+			Severity:  6,
+			Tag:       "test",
+			Timestamp: now.Add(-e.age),
+			Content:   "message",
+		})
+		_ = i // used for debugging if needed
+	}
+
+	// Trigger eviction by adding one more entry
+	buf.Add(models.LogEntry{
+		Client:    "test",
+		Hostname:  "host",
+		Severity:  6,
+		Tag:       "test",
+		Timestamp: now,
+		Content:   "trigger",
+	})
+
+	// Count should be 4 (3 kept + 1 trigger) - the 2 old ones should be evicted
+	if buf.Count() != 4 {
+		t.Errorf("expected 4 entries after time-based eviction, got %d", buf.Count())
+	}
+
+	// Verify all remaining entries are within retention period
+	result := buf.Query(models.LogFilter{})
+	cutoff := now.Add(-retentionDuration)
+	for _, entry := range result.Entries {
+		if entry.Timestamp.Before(cutoff) {
+			t.Errorf("found entry older than retention period: %v (cutoff: %v)", entry.Timestamp, cutoff)
+		}
+	}
+}
+
+func TestCircularBuffer_TimeBasedEvictionDisabled(t *testing.T) {
+	// Create buffer with retention disabled (0)
+	buf := NewWithOptions(100*1024*1024, DefaultReorderWindow, 0)
+
+	now := time.Now()
+
+	// Add entries with very old timestamps
+	for i := 0; i < 5; i++ {
+		buf.Add(models.LogEntry{
+			Client:    "test",
+			Hostname:  "host",
+			Severity:  6,
+			Tag:       "test",
+			Timestamp: now.Add(-time.Duration(i*24) * time.Hour * 365), // years old
+			Content:   "old message",
+		})
+	}
+
+	// All entries should be kept since retention is disabled
+	if buf.Count() != 5 {
+		t.Errorf("expected 5 entries when retention disabled, got %d", buf.Count())
+	}
+}
+
+func TestCircularBuffer_BothSizeAndTimeEviction(t *testing.T) {
+	// Create a small buffer with retention
+	// Small size to trigger size-based eviction, with time-based as well
+	retentionDuration := 1 * time.Hour
+	buf := NewWithOptions(2*1024, DefaultReorderWindow, retentionDuration) // 2 KB
+
+	now := time.Now()
+
+	// Add entries with increasing age - some older than retention, some newer
+	// The newest entries should survive both size and time constraints
+	for i := 0; i < 20; i++ {
+		// Start with oldest entries (will be evicted) and progress to newest
+		age := time.Duration((20-i)*10) * time.Minute
+		buf.Add(models.LogEntry{
+			Client:    "test",
+			Hostname:  "host",
+			Severity:  6,
+			Tag:       "test",
+			Timestamp: now.Add(-age),
+			Content:   "this is a reasonably long message to take up buffer space for testing",
+		})
+	}
+
+	// Trigger final cleanup by adding a current entry
+	buf.Add(models.LogEntry{
+		Client:    "test",
+		Hostname:  "host",
+		Severity:  6,
+		Tag:       "final",
+		Timestamp: now,
+		Content:   "final entry to trigger eviction",
+	})
+
+	// Buffer should respect both limits
+	if buf.CurrentSizeBytes() > buf.MaxSizeBytes() {
+		t.Errorf("buffer exceeded max size: %d > %d", buf.CurrentSizeBytes(), buf.MaxSizeBytes())
+	}
+
+	// Verify size limit is being respected
+	if buf.Count() == 0 {
+		t.Error("buffer should have at least some entries")
+	}
+}

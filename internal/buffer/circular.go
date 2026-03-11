@@ -18,20 +18,21 @@ const (
 )
 
 // CircularBuffer is a thread-safe circular buffer for storing log entries
-// limited by total memory usage in bytes.
+// limited by total memory usage in bytes and/or entry age.
 type CircularBuffer struct {
-	entries       []models.LogEntry
-	entrySizes    []int // Size of each entry for quick eviction calculation
-	maxSizeBytes  int64 // Maximum total size in bytes
-	currentSize   int64 // Current total size in bytes
-	count         int
-	head          int // Points to the next write position
-	tail          int // Points to the oldest entry
-	capacity      int // Current slice capacity
-	mu            sync.RWMutex
-	idSeq         uint64
-	onChange      func(entry models.LogEntry) // Callback for new entries
-	reorderWindow time.Duration               // Time window for reordering out-of-order logs
+	entries           []models.LogEntry
+	entrySizes        []int // Size of each entry for quick eviction calculation
+	maxSizeBytes      int64 // Maximum total size in bytes
+	currentSize       int64 // Current total size in bytes
+	count             int
+	head              int // Points to the next write position
+	tail              int // Points to the oldest entry
+	capacity          int // Current slice capacity
+	mu                sync.RWMutex
+	idSeq             uint64
+	onChange          func(entry models.LogEntry) // Callback for new entries
+	reorderWindow     time.Duration               // Time window for reordering out-of-order logs
+	retentionDuration time.Duration               // Maximum age for entries (0 = disabled)
 }
 
 // New creates a new circular buffer with the specified maximum size in bytes.
@@ -45,24 +46,36 @@ func New(maxSizeBytes int64) *CircularBuffer {
 // out-of-order log entries. Logs within this window will be inserted in
 // timestamp-sorted order; logs older than the window are appended at the end.
 func NewWithReorderWindow(maxSizeBytes int64, reorderWindow time.Duration) *CircularBuffer {
+	return NewWithOptions(maxSizeBytes, reorderWindow, 0)
+}
+
+// NewWithOptions creates a new circular buffer with all configuration options.
+// - maxSizeBytes: Maximum buffer size in bytes (0 or negative = default 100 MB)
+// - reorderWindow: Time window for reordering out-of-order logs (negative = default 1 hour)
+// - retentionDuration: Maximum age for entries, older entries are evicted (0 = disabled)
+func NewWithOptions(maxSizeBytes int64, reorderWindow, retentionDuration time.Duration) *CircularBuffer {
 	if maxSizeBytes <= 0 {
 		maxSizeBytes = DefaultMaxSizeBytes
 	}
 	if reorderWindow < 0 {
 		reorderWindow = DefaultReorderWindow
 	}
+	if retentionDuration < 0 {
+		retentionDuration = 0
+	}
 	// Start with a reasonable initial capacity
 	initialCapacity := 10000
 	return &CircularBuffer{
-		entries:       make([]models.LogEntry, initialCapacity),
-		entrySizes:    make([]int, initialCapacity),
-		maxSizeBytes:  maxSizeBytes,
-		currentSize:   0,
-		capacity:      initialCapacity,
-		count:         0,
-		head:          0,
-		tail:          0,
-		reorderWindow: reorderWindow,
+		entries:           make([]models.LogEntry, initialCapacity),
+		entrySizes:        make([]int, initialCapacity),
+		maxSizeBytes:      maxSizeBytes,
+		currentSize:       0,
+		capacity:          initialCapacity,
+		count:             0,
+		head:              0,
+		tail:              0,
+		reorderWindow:     reorderWindow,
+		retentionDuration: retentionDuration,
 	}
 }
 
@@ -86,9 +99,17 @@ func (b *CircularBuffer) Add(entry models.LogEntry) models.LogEntry {
 	// Calculate entry size
 	entrySize := entry.EstimateSize()
 
-	// Evict oldest entries until we have room for the new one
+	// Evict oldest entries until we have room for the new one (size-based)
 	for b.count > 0 && b.currentSize+int64(entrySize) > b.maxSizeBytes {
 		b.evictOldest()
+	}
+
+	// Evict entries older than retention limit (time-based)
+	if b.retentionDuration > 0 {
+		cutoff := time.Now().Add(-b.retentionDuration)
+		for b.count > 0 && b.entries[b.tail].Timestamp.Before(cutoff) {
+			b.evictOldest()
+		}
 	}
 
 	// Grow capacity if needed

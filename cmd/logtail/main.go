@@ -41,11 +41,11 @@ func main() {
 	}
 
 	log.Printf("Loaded configuration from: %s", cliCfg.ConfigFile)
-	log.Printf("Server port: %d, Buffer size: %d MB", cfg.Server.Port, cfg.Buffer.SizeMB)
+	log.Printf("Server port: %d, Buffer size: %d MB, Retention: %d days", cfg.Server.Port, cfg.Buffer.SizeMB, cfg.Buffer.RetentionDays)
 
-	// Initialize circular buffer
-	buf := buffer.New(cfg.BufferSizeBytes())
-	log.Printf("Initialized circular buffer with max size: %d MB", cfg.Buffer.SizeMB)
+	// Initialize circular buffer with size and time-based retention
+	buf := buffer.NewWithOptions(cfg.BufferSizeBytes(), buffer.DefaultReorderWindow, cfg.RetentionDuration())
+	log.Printf("Initialized circular buffer with max size: %d MB, retention: %d days", cfg.Buffer.SizeMB, cfg.Buffer.RetentionDays)
 
 	// Restore buffer from persistence file if configured
 	if cfg.Buffer.PersistPath != "" {

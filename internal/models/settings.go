@@ -3,6 +3,7 @@ package models
 import (
 	"os"
 	"sync"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -41,6 +42,10 @@ type BufferConfig struct {
 	// SizeMB is the maximum buffer size in megabytes
 	SizeMB int `yaml:"size_mb" json:"sizeMB"`
 
+	// RetentionDays is the maximum age in days for log entries
+	// Entries older than this will be evicted. If 0, no time-based eviction.
+	RetentionDays int `yaml:"retention_days" json:"retentionDays"`
+
 	// PersistPath is the file path for buffer persistence
 	// If empty, persistence is disabled
 	PersistPath string `yaml:"persist_path,omitempty" json:"persistPath"`
@@ -61,7 +66,8 @@ func DefaultConfig() Config {
 			ExclusionPatterns: []string{},
 		},
 		Buffer: BufferConfig{
-			SizeMB: 100,
+			SizeMB:        100,
+			RetentionDays: 30,
 		},
 	}
 }
@@ -74,12 +80,24 @@ func (c *Config) Validate() error {
 	if c.Buffer.SizeMB < 1 {
 		return &ConfigError{Field: "buffer.size_mb", Message: "must be at least 1"}
 	}
+	if c.Buffer.RetentionDays < 0 {
+		return &ConfigError{Field: "buffer.retention_days", Message: "must be >= 0"}
+	}
 	return nil
 }
 
 // BufferSizeBytes returns the buffer size in bytes
 func (c *Config) BufferSizeBytes() int64 {
 	return int64(c.Buffer.SizeMB) * 1024 * 1024
+}
+
+// RetentionDuration returns the retention period as time.Duration.
+// Returns 0 if retention is disabled (RetentionDays <= 0).
+func (c *Config) RetentionDuration() time.Duration {
+	if c.Buffer.RetentionDays <= 0 {
+		return 0
+	}
+	return time.Duration(c.Buffer.RetentionDays) * 24 * time.Hour
 }
 
 // ConfigError represents a configuration validation error

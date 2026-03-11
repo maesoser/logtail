@@ -25,6 +25,7 @@ interface BackendConfig {
   };
   buffer: {
     sizeMB: number;
+    retentionDays: number;
     persistPath: string;
     autoSaveMinutes: number;
   };
@@ -56,6 +57,7 @@ export function Settings({
   // Server settings state
   const [serverPort, setServerPort] = useState(8080);
   const [bufferSizeMB, setBufferSizeMB] = useState(100);
+  const [retentionDays, setRetentionDays] = useState(30);
   const [persistPath, setPersistPath] = useState('');
   const [autoSaveMinutes, setAutoSaveMinutes] = useState(0);
   const [serverDirty, setServerDirty] = useState(false);
@@ -87,6 +89,7 @@ export function Settings({
         setBackendConfig(data);
         setServerPort(data.server.port);
         setBufferSizeMB(data.buffer.sizeMB);
+        setRetentionDays(data.buffer.retentionDays);
         setPersistPath(data.buffer.persistPath || '');
         setAutoSaveMinutes(data.buffer.autoSaveMinutes || 0);
         setServerDirty(false);
@@ -107,7 +110,7 @@ export function Settings({
   const saveConfig = async (updates: {
     server?: { port?: number };
     ingest?: { authToken?: string; exclusionPatterns?: string[] };
-    buffer?: { sizeMB?: number; persistPath?: string; autoSaveMinutes?: number };
+    buffer?: { sizeMB?: number; retentionDays?: number; persistPath?: string; autoSaveMinutes?: number };
   }) => {
     setSaving(true);
     setError(null);
@@ -122,6 +125,7 @@ export function Settings({
         setBackendConfig(data);
         setServerPort(data.server.port);
         setBufferSizeMB(data.buffer.sizeMB);
+        setRetentionDays(data.buffer.retentionDays);
         setPersistPath(data.buffer.persistPath || '');
         setAutoSaveMinutes(data.buffer.autoSaveMinutes || 0);
         setServerDirty(false);
@@ -170,6 +174,7 @@ export function Settings({
       server: { port: serverPort },
       buffer: { 
         sizeMB: bufferSizeMB,
+        retentionDays: retentionDays,
         persistPath: persistPath,
         autoSaveMinutes: autoSaveMinutes,
       },
@@ -381,6 +386,27 @@ export function Settings({
                       />
                       <p className="text-xs text-kumo-inactive mt-1">
                         Maximum memory for log storage. Older logs are evicted when limit is reached. Requires restart.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-kumo-default mb-2">
+                        Retention Period (days)
+                      </label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={365}
+                        value={retentionDays}
+                        onChange={(e) => {
+                          setRetentionDays(parseInt(e.target.value) || 0);
+                          setServerDirty(true);
+                        }}
+                        aria-label="Retention period in days"
+                        className="w-32"
+                      />
+                      <p className="text-xs text-kumo-inactive mt-1">
+                        Maximum age for log entries. Logs older than this are automatically evicted. Set to 0 to disable time-based eviction. Requires restart.
                       </p>
                     </div>
 
