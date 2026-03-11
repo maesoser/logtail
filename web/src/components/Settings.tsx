@@ -168,23 +168,7 @@ export function Settings({
     onColumnsChange(newColumns);
   };
 
-  // Server settings handlers
-  const handleSaveServerSettings = () => {
-    saveConfig({
-      server: { port: serverPort },
-      buffer: { 
-        sizeMB: bufferSizeMB,
-        retentionDays: retentionDays,
-        persistPath: persistPath,
-        autoSaveMinutes: autoSaveMinutes,
-      },
-    });
-  };
-
   // Auth token handlers
-  const handleSaveToken = () => {
-    saveConfig({ ingest: { authToken } });
-  };
 
   const handleClearToken = () => {
     saveConfig({ ingest: { authToken: '' } });
@@ -207,8 +191,38 @@ export function Settings({
     setExclusionsDirty(true);
   };
 
-  const handleSaveExclusions = () => {
-    saveConfig({ ingest: { exclusionPatterns } });
+  // Check if any settings have been modified
+  const hasUnsavedChanges = serverDirty || tokenDirty || exclusionsDirty;
+
+  // Save all pending changes
+  const handleSaveAll = async () => {
+    if (!hasUnsavedChanges) return;
+    
+    const updates: {
+      server?: { port?: number };
+      ingest?: { authToken?: string; exclusionPatterns?: string[] };
+      buffer?: { sizeMB?: number; retentionDays?: number; persistPath?: string; autoSaveMinutes?: number };
+    } = {};
+
+    if (serverDirty) {
+      updates.server = { port: serverPort };
+      updates.buffer = {
+        sizeMB: bufferSizeMB,
+        retentionDays: retentionDays,
+        persistPath: persistPath,
+        autoSaveMinutes: autoSaveMinutes,
+      };
+    }
+
+    if (tokenDirty) {
+      updates.ingest = { ...updates.ingest, authToken };
+    }
+
+    if (exclusionsDirty) {
+      updates.ingest = { ...updates.ingest, exclusionPatterns };
+    }
+
+    await saveConfig(updates);
   };
 
   const visibleCount = columns.filter(c => c.visible).length;
@@ -230,7 +244,7 @@ export function Settings({
           </Button>
         )}
       />
-      <Dialog className="p-0 overflow-hidden" size="lg">
+      <Dialog className="p-0 overflow-hidden !w-[calc(100vw-8rem)] !max-w-5xl h-[calc(100vh-8rem)] flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
           <div>
@@ -285,7 +299,7 @@ export function Settings({
         </div>
 
         {/* Tab Content */}
-        <div className="px-6 py-4 max-h-96 overflow-y-auto">
+        <div className="px-6 py-4 flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8 text-kumo-subtle">
               Loading...
@@ -457,21 +471,6 @@ export function Settings({
                       </div>
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleSaveServerSettings}
-                        disabled={!serverDirty || saving}
-                      >
-                        {saving ? 'Saving...' : 'Save Settings'}
-                      </Button>
-                      {serverDirty && (
-                        <span className="text-xs text-kumo-warning self-center">
-                          Unsaved changes (restart required)
-                        </span>
-                      )}
-                    </div>
                   </div>
                 </div>
               )}
@@ -520,16 +519,8 @@ export function Settings({
                       </p>
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleSaveToken}
-                        disabled={!tokenDirty || saving}
-                      >
-                        {saving ? 'Saving...' : 'Save Token'}
-                      </Button>
-                      {backendConfig?.ingest.hasAuthToken && (
+                    {backendConfig?.ingest.hasAuthToken && (
+                      <div className="mt-4">
                         <Button
                           variant="outline"
                           size="sm"
@@ -538,8 +529,8 @@ export function Settings({
                         >
                           Clear Token
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -618,22 +609,6 @@ export function Settings({
                       )}
                     </div>
                     
-                    {/* Save button */}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleSaveExclusions}
-                        disabled={!exclusionsDirty || saving}
-                      >
-                        {saving ? 'Saving...' : 'Save Exclusions'}
-                      </Button>
-                      {exclusionsDirty && (
-                        <span className="text-xs text-kumo-warning self-center">
-                          Unsaved changes
-                        </span>
-                      )}
-                    </div>
                   </div>
                 </div>
               )}
@@ -645,8 +620,19 @@ export function Settings({
         <div className="flex justify-end px-6 py-4 border-t border-kumo-line bg-kumo-tint">
           <Dialog.Close
             render={(props) => (
-              <Button {...props} variant="primary">
-                Done
+              <Button
+                {...props}
+                variant="primary"
+                disabled={saving}
+                onClick={async (e) => {
+                  if (hasUnsavedChanges) {
+                    e.preventDefault();
+                    await handleSaveAll();
+                    setIsOpen(false);
+                  }
+                }}
+              >
+                {saving ? 'Saving...' : 'Save'}
               </Button>
             )}
           />
