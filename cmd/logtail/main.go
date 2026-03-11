@@ -91,32 +91,62 @@ func main() {
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	sig := <-quit
 
-	log.Println("Shutting down server...")
+	log.Printf("Received signal %v, initiating graceful shutdown...", sig)
 
-	// Stop auto-save goroutine
+	// Track if any shutdown step failed
+	var exitCode int
+
+	// Step 1: Stop accepting new HTTP connections and wait for in-flight requests
+	log.Println("Stopping HTTP server...")
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
+		exitCode = 1
+	} else {
+		log.Println("HTTP server stopped")
+	}
+	shutdownCancel()
+
+	// Step 2: Stop WebSocket hub (disconnects all clients)
+	log.Println("Stopping WebSocket hub...")
+	hub.Stop()
+
+	// Step 3: Stop auto-save goroutine
 	close(autoSaveStop)
 
-	// Save buffer to persistence file if configured
+	// Step 4: Final buffer save with timeout protection
 	if cfg.Buffer.PersistPath != "" {
-		log.Printf("Saving buffer to %s...", cfg.Buffer.PersistPath)
-		if err := buf.Save(cfg.Buffer.PersistPath); err != nil {
-			log.Printf("Error saving buffer: %v", err)
+		log.Printf("Saving buffer (%d entries) to %s...", buf.Count(), cfg.Buffer.PersistPath)
+
+		saveErr := saveBufferWithTimeout(buf, cfg.Buffer.PersistPath, 30*time.Second)
+		if saveErr != nil {
+			log.Printf("Error saving buffer: %v", saveErr)
+			exitCode = 1
 		} else {
-			log.Printf("Saved %d entries to %s", buf.Count(), cfg.Buffer.PersistPath)
+			log.Printf("Buffer saved successfully to %s", cfg.Buffer.PersistPath)
 		}
 	}
 
-	// Graceful shutdown with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	log.Println("Shutdown complete")
+	os.Exit(exitCode)
+}
 
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server shutdown error: %v", err)
+// saveBufferWithTimeout saves the buffer with a timeout to prevent hanging on shutdown
+func saveBufferWithTimeout(buf *buffer.CircularBuffer, path string, timeout time.Duration) error {
+	done := make(chan error, 1)
+
+	go func() {
+		done <- buf.Save(path)
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(timeout):
+		return fmt.Errorf("save operation timed out after %v", timeout)
 	}
-
-	log.Println("Server stopped")
 }
 
 // startAutoSave periodically saves the buffer to the persistence file

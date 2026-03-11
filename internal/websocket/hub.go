@@ -32,6 +32,8 @@ type Hub struct {
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
+	stop       chan struct{}
+	done       chan struct{}
 	mu         sync.RWMutex
 }
 
@@ -42,13 +44,28 @@ func NewHub() *Hub {
 		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		stop:       make(chan struct{}),
+		done:       make(chan struct{}),
 	}
 }
 
 // Run starts the hub's main loop
 func (h *Hub) Run() {
+	defer close(h.done)
+
 	for {
 		select {
+		case <-h.stop:
+			// Gracefully close all client connections
+			h.mu.Lock()
+			for client := range h.clients {
+				close(client.send)
+				delete(h.clients, client)
+			}
+			h.mu.Unlock()
+			log.Printf("WebSocket hub stopped, all clients disconnected")
+			return
+
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
@@ -117,6 +134,13 @@ func (h *Hub) ClientCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
+}
+
+// Stop gracefully stops the hub and disconnects all clients.
+// It blocks until all clients have been disconnected.
+func (h *Hub) Stop() {
+	close(h.stop)
+	<-h.done
 }
 
 // ServeWS handles WebSocket requests from clients
