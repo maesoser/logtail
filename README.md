@@ -2,6 +2,8 @@
 
 _The uncomplicated logs dashboard for your homelab._
 
+![Logtail Screenshot](pics/screenshot.png)
+
 An opinionated log ingestion and visualization application with a Go backend and React frontend.
 
 ## But why?
