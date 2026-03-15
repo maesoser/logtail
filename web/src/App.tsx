@@ -99,6 +99,11 @@ function App() {
     refetchStats();
   }, [refetchLogs, refetchStats]);
   
+  // Handle histogram bucket click to filter by time range
+  const handleHistogramBucketClick = useCallback((from: string, to: string) => {
+    handleFilterChange({ ...filter, from, to, page: 1 });
+  }, [filter, handleFilterChange]);
+  
   // Handle entry selection for drawer
   const handleEntrySelect = useCallback((entry: LogEntry) => {
     setSelectedEntry(entry);
@@ -195,6 +200,7 @@ function App() {
               bucketMinutes={stats.bucketMinutes}
               timeRange={timeRange}
               onTimeRangeChange={setTimeRange}
+              onBucketClick={handleHistogramBucketClick}
             />
           )
         )}

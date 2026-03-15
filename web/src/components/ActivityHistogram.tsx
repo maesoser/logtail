@@ -9,6 +9,7 @@ interface ActivityHistogramProps {
   bucketMinutes: number;
   timeRange: TimeRange;
   onTimeRangeChange: (range: TimeRange) => void;
+  onBucketClick?: (from: string, to: string) => void;
   height?: number;
 }
 
@@ -64,7 +65,31 @@ function formatTimeRangeLabel(range: TimeRange): string {
   }
 }
 
-export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeChange, height = 80 }: ActivityHistogramProps) {
+// Compute actual Date range for a histogram bucket based on its position
+function computeBucketTimeRange(
+  barIndex: number,
+  totalBars: number,
+  bucketMinutes: number
+): { from: Date; to: Date } {
+  const now = new Date();
+  
+  // Align "now" to the current bucket boundary
+  const minutes = now.getMinutes();
+  const alignedMinutes = Math.floor(minutes / bucketMinutes) * bucketMinutes;
+  const alignedNow = new Date(now);
+  alignedNow.setMinutes(alignedMinutes, 0, 0);
+  
+  // bars[0] is oldest, bars[totalBars-1] is most recent (closest to now)
+  const bucketsFromNow = totalBars - 1 - barIndex;
+  
+  // The most recent bucket ends at alignedNow + bucketMinutes (covering "now")
+  const bucketEnd = new Date(alignedNow.getTime() + bucketMinutes * 60 * 1000 - bucketsFromNow * bucketMinutes * 60 * 1000);
+  const bucketStart = new Date(bucketEnd.getTime() - bucketMinutes * 60 * 1000);
+  
+  return { from: bucketStart, to: bucketEnd };
+}
+
+export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeChange, onBucketClick, height = 80 }: ActivityHistogramProps) {
   const { maxCount, bars } = useMemo(() => {
     const max = Math.max(...data.map(b => b.count), 1);
     const barsData = data.map((bucket, index) => ({
@@ -74,6 +99,13 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
     }));
     return { maxCount: max, bars: barsData };
   }, [data]);
+
+  const handleBarClick = (bar: typeof bars[number]) => {
+    if (!onBucketClick) return;
+    
+    const { from, to } = computeBucketTimeRange(bar.index, bars.length, bucketMinutes);
+    onBucketClick(from.toISOString(), to.toISOString());
+  };
 
   const availableHeight = height - 8;
 
@@ -147,7 +179,8 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
                 <Popover.Trigger
                   openOnHover
                   delay={100}
-                  className="flex-1 flex flex-col justify-end cursor-pointer min-w-0"
+                  onClick={() => handleBarClick(bar)}
+                  className="flex-1 flex flex-col justify-end cursor-pointer min-w-0 hover:opacity-80 transition-opacity"
                   style={{ height: `${height - 8}px` }}
                 >
                   {segments.map((segment, segIdx) => (
