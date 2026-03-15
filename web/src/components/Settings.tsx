@@ -537,78 +537,75 @@ export function Settings({
 
               {/* Exclusions Tab */}
               {activeTab === 'exclusions' && (
-                <div>
+                <div className="flex flex-col h-full">
                   <p className="text-sm text-kumo-subtle mb-4">
                     Define strings that will cause log messages to be discarded during ingestion.
                     If an incoming log contains any of these strings (case-insensitive), it will not be stored.
                   </p>
                   
-                  <div className="space-y-4">
-                    {/* Add new pattern */}
-                    <div>
-                      <label className="block text-sm font-medium text-kumo-default mb-2">
-                        Add Exclusion Pattern
-                      </label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={newPattern}
-                          onChange={(e) => setNewPattern(e.target.value)}
-                          placeholder="e.g., healthcheck, DEBUG, /api/ping"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddPattern();
-                            }
-                          }}
-                          aria-label="New exclusion pattern"
-                          className="flex-1"
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={handleAddPattern}
-                          disabled={!newPattern.trim()}
-                          aria-label="Add pattern"
-                        >
-                          <PlusIcon size={16} />
-                        </Button>
-                      </div>
+                  {/* Add new pattern */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-kumo-default mb-2">
+                      Add Exclusion Pattern
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={newPattern}
+                        onChange={(e) => setNewPattern(e.target.value)}
+                        placeholder="e.g., healthcheck, DEBUG, /api/ping"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddPattern();
+                          }
+                        }}
+                        aria-label="New exclusion pattern"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={handleAddPattern}
+                        disabled={!newPattern.trim()}
+                        aria-label="Add pattern"
+                      >
+                        <PlusIcon size={16} />
+                      </Button>
                     </div>
-                    
-                    {/* Pattern list */}
-                    <div>
-                      <label className="block text-sm font-medium text-kumo-default mb-2">
-                        Active Exclusion Patterns ({exclusionPatterns.length})
-                      </label>
-                      {exclusionPatterns.length === 0 ? (
-                        <p className="text-sm text-kumo-inactive py-4 text-center border border-dashed border-kumo-line rounded">
-                          No exclusion patterns configured. All logs will be stored.
-                        </p>
-                      ) : (
-                        <ul className="space-y-2 max-h-48 overflow-y-auto">
-                          {exclusionPatterns.map((pattern, index) => (
-                            <li
-                              key={index}
-                              className="flex items-center justify-between gap-2 px-3 py-2 bg-kumo-tint rounded border border-kumo-line"
+                  </div>
+                  
+                  {/* Pattern list */}
+                  <div className="flex flex-col flex-1 min-h-0">
+                    <label className="block text-sm font-medium text-kumo-default mb-2">
+                      Active Exclusion Patterns ({exclusionPatterns.length})
+                    </label>
+                    {exclusionPatterns.length === 0 ? (
+                      <p className="text-sm text-kumo-inactive py-4 text-center border border-dashed border-kumo-line rounded">
+                        No exclusion patterns configured. All logs will be stored.
+                      </p>
+                    ) : (
+                      <ul className="space-y-2 flex-1 min-h-0 overflow-y-auto">
+                        {exclusionPatterns.map((pattern, index) => (
+                          <li
+                            key={index}
+                            className="flex items-center justify-between gap-2 px-3 py-2 bg-kumo-tint rounded border border-kumo-line"
+                          >
+                            <code className="text-sm font-mono text-kumo-default truncate flex-1">
+                              {pattern}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              shape="square"
+                              onClick={() => handleRemovePattern(index)}
+                              aria-label={`Remove pattern "${pattern}"`}
+                              className="text-kumo-danger hover:bg-kumo-danger-tint"
                             >
-                              <code className="text-sm font-mono text-kumo-default truncate flex-1">
-                                {pattern}
-                              </code>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                shape="square"
-                                onClick={() => handleRemovePattern(index)}
-                                aria-label={`Remove pattern "${pattern}"`}
-                                className="text-kumo-danger hover:bg-kumo-danger-tint"
-                              >
-                                <TrashIcon size={14} />
-                              </Button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    
+                              <TrashIcon size={14} />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               )}

@@ -159,12 +159,14 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
                         backgroundColor: segment.color,
                         borderTopLeftRadius: segIdx === segments.length - 1 ? 2 : 0,
                         borderTopRightRadius: segIdx === segments.length - 1 ? 2 : 0,
+                        borderBottomLeftRadius: 0,
+                        borderBottomRightRadius: 0,
                       }}
                     />
                   ))}
                 </Popover.Trigger>
                 <Popover.Portal>
-                  <Popover.Positioner side="top" align="center" collisionPadding={8} sideOffset={8}>
+                  <Popover.Positioner side="bottom" align="center" collisionPadding={8} sideOffset={8}>
                     <Popover.Popup className="min-w-[160px] flex flex-col rounded-lg bg-kumo-elevated px-4 py-3 text-sm shadow-lg border border-kumo-line">
                       <Popover.Title className="text-sm font-semibold text-kumo-default">
                         {bar.hour} - {intervalEnd}
