@@ -42,6 +42,154 @@ interface KeyValuePair {
   rawValue: string; // Original value including quotes if present
 }
 
+// Token types for syntax highlighting
+type TokenType = 'uuid' | 'timestamp' | 'url' | 'ip' | 'text';
+
+interface Token {
+  type: TokenType;
+  value: string;
+  start: number;
+  end: number;
+}
+
+// Pattern definitions for special values (order matters - checked in this order for priority)
+const VALUE_PATTERNS: { type: TokenType; pattern: RegExp }[] = [
+  // ISO timestamps: 2026-03-19T17:36:23Z, 2026-03-19T17:36:23.123456Z, 2026-03-19T17:36:23+00:00
+  { type: 'timestamp', pattern: /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g },
+  
+  // UUIDs: 550e8400-e29b-41d4-a716-446655440000
+  { type: 'uuid', pattern: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi },
+  
+  // URLs: http://, https://, udp:, tcp:, unix: (must come before IP to catch full URLs)
+  { type: 'url', pattern: /(?:https?|udp|tcp|unix):\/\/[^\s"]+/gi },
+  
+  // IPv4 with optional port: 192.168.1.1, 192.168.1.1:8080
+  { type: 'ip', pattern: /\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::\d{1,5})?\b/g },
+  
+  // IPv6 with optional port: ::1, fe80::1, [::1]:8080, [2001:db8::1]:443
+  { type: 'ip', pattern: /\[?(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}|:(?::[0-9a-fA-F]{1,4}){1,7}|::)\]?(?::\d{1,5})?/g },
+];
+
+// Color classes for each token type
+const TOKEN_COLORS: Record<TokenType, string> = {
+  uuid: 'text-violet-600 dark:text-violet-400',
+  timestamp: 'text-cyan-600 dark:text-cyan-400',
+  url: 'text-teal-600 dark:text-teal-400',
+  ip: 'text-sky-600 dark:text-sky-400',
+  text: 'text-green-600 dark:text-green-400', // Default string color
+};
+
+// Tokenize a value string, finding all special patterns
+function tokenizeValue(value: string): Token[] {
+  const tokens: Token[] = [];
+  const matches: Token[] = [];
+  
+  // Find all matches for all patterns
+  for (const { type, pattern } of VALUE_PATTERNS) {
+    // Reset regex state
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(value)) !== null) {
+      matches.push({
+        type,
+        value: match[0],
+        start: match.index,
+        end: match.index + match[0].length,
+      });
+    }
+  }
+  
+  // Sort by start position
+  matches.sort((a, b) => a.start - b.start);
+  
+  // Remove overlapping matches (keep earlier/higher priority ones)
+  const nonOverlapping: Token[] = [];
+  let lastEnd = 0;
+  for (const match of matches) {
+    if (match.start >= lastEnd) {
+      nonOverlapping.push(match);
+      lastEnd = match.end;
+    }
+  }
+  
+  // Build final token list with text segments between matches
+  let pos = 0;
+  for (const match of nonOverlapping) {
+    // Add text before this match
+    if (match.start > pos) {
+      tokens.push({
+        type: 'text',
+        value: value.slice(pos, match.start),
+        start: pos,
+        end: match.start,
+      });
+    }
+    tokens.push(match);
+    pos = match.end;
+  }
+  
+  // Add remaining text after last match
+  if (pos < value.length) {
+    tokens.push({
+      type: 'text',
+      value: value.slice(pos),
+      start: pos,
+      end: value.length,
+    });
+  }
+  
+  // If no tokens, return the whole value as text
+  if (tokens.length === 0) {
+    tokens.push({
+      type: 'text',
+      value,
+      start: 0,
+      end: value.length,
+    });
+  }
+  
+  return tokens;
+}
+
+// Check if value contains any special patterns worth tokenizing
+function hasSpecialPatterns(value: string): boolean {
+  for (const { pattern } of VALUE_PATTERNS) {
+    pattern.lastIndex = 0;
+    if (pattern.test(value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Render tokenized value with syntax highlighting and optional search highlighting
+function renderTokenizedValue(
+  tokens: Token[], 
+  searchTerm?: string,
+  defaultClass?: string
+): React.ReactNode {
+  return tokens.map((token, index) => {
+    const colorClass = token.type === 'text' && defaultClass 
+      ? defaultClass 
+      : TOKEN_COLORS[token.type];
+    
+    // Apply search highlighting within the token
+    if (searchTerm) {
+      return (
+        <span key={index} className={colorClass}>
+          <HighlightSearch text={token.value} searchTerm={searchTerm} />
+        </span>
+      );
+    }
+    
+    return (
+      <span key={index} className={colorClass}>
+        {token.value}
+      </span>
+    );
+  });
+}
+
 // Check if content looks like key=value format (logfmt style)
 // Examples: time="2026-03-19T17:36:23Z" level=error msg="failed to connect"
 function isKeyValueContent(content: string): boolean {
@@ -81,40 +229,113 @@ function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.React
   const { key, value, rawValue } = pair;
   const isQuoted = rawValue.startsWith('"');
   
-  // Determine value color based on content
-  let valueClass = 'text-green-600 dark:text-green-400'; // Default string color
-  
+  // Check for simple value types first (exact matches)
   if (!isQuoted) {
-    // Unquoted values - check type
+    // Booleans
     if (value === 'true' || value === 'false') {
-      valueClass = 'text-purple-600 dark:text-purple-400';
-    } else if (value === 'null' || value === 'nil') {
-      valueClass = 'text-gray-500';
-    } else if (/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)) {
-      valueClass = 'text-orange-600 dark:text-orange-400';
-    } else if (/^(error|err|fatal|critical|crit)$/i.test(value)) {
-      valueClass = 'text-red-600 dark:text-red-400';
-    } else if (/^(warn|warning)$/i.test(value)) {
-      valueClass = 'text-amber-600 dark:text-amber-400';
-    } else if (/^(info|notice)$/i.test(value)) {
-      valueClass = 'text-blue-600 dark:text-blue-400';
-    } else if (/^(debug|trace)$/i.test(value)) {
-      valueClass = 'text-gray-500 dark:text-gray-400';
+      return (
+        <>
+          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-kumo-subtle">=</span>
+          <span className="text-purple-600 dark:text-purple-400">{value}</span>
+        </>
+      );
+    }
+    // Null
+    if (value === 'null' || value === 'nil') {
+      return (
+        <>
+          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-kumo-subtle">=</span>
+          <span className="text-gray-500">{value}</span>
+        </>
+      );
+    }
+    // Pure numbers
+    if (/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)) {
+      return (
+        <>
+          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-kumo-subtle">=</span>
+          <span className="text-orange-600 dark:text-orange-400">{value}</span>
+        </>
+      );
+    }
+    // Log levels (exact match)
+    if (/^(error|err|fatal|critical|crit)$/i.test(value)) {
+      return (
+        <>
+          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-kumo-subtle">=</span>
+          <span className="text-red-600 dark:text-red-400">{value}</span>
+        </>
+      );
+    }
+    if (/^(warn|warning)$/i.test(value)) {
+      return (
+        <>
+          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-kumo-subtle">=</span>
+          <span className="text-amber-600 dark:text-amber-400">{value}</span>
+        </>
+      );
+    }
+    if (/^(info|notice)$/i.test(value)) {
+      return (
+        <>
+          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-kumo-subtle">=</span>
+          <span className="text-blue-600 dark:text-blue-400">{value}</span>
+        </>
+      );
+    }
+    if (/^(debug|trace)$/i.test(value)) {
+      return (
+        <>
+          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-kumo-subtle">=</span>
+          <span className="text-gray-500 dark:text-gray-400">{value}</span>
+        </>
+      );
     }
   }
   
-  // Apply search highlighting to value if needed
+  // For complex values, check for special patterns (URLs, IPs, timestamps, UUIDs)
+  if (hasSpecialPatterns(value)) {
+    const tokens = tokenizeValue(value);
+    const displayValue = isQuoted ? `"${value}"` : value;
+    
+    // Re-tokenize with quotes if quoted
+    const displayTokens = isQuoted 
+      ? [
+          { type: 'text' as TokenType, value: '"', start: 0, end: 1 },
+          ...tokens.map(t => ({ ...t, start: t.start + 1, end: t.end + 1 })),
+          { type: 'text' as TokenType, value: '"', start: displayValue.length - 1, end: displayValue.length },
+        ]
+      : tokens;
+    
+    return (
+      <>
+        <span className="text-blue-600 dark:text-blue-400">{key}</span>
+        <span className="text-kumo-subtle">=</span>
+        {renderTokenizedValue(displayTokens, searchTerm, 'text-green-600 dark:text-green-400')}
+      </>
+    );
+  }
+  
+  // Default: simple string value with optional search highlighting
+  const displayValue = isQuoted ? `"${value}"` : value;
   const highlightedValue = searchTerm ? (
-    <HighlightSearch text={isQuoted ? `"${value}"` : value} searchTerm={searchTerm} />
+    <HighlightSearch text={displayValue} searchTerm={searchTerm} />
   ) : (
-    isQuoted ? `"${value}"` : value
+    displayValue
   );
   
   return (
     <>
       <span className="text-blue-600 dark:text-blue-400">{key}</span>
       <span className="text-kumo-subtle">=</span>
-      <span className={valueClass}>{highlightedValue}</span>
+      <span className="text-green-600 dark:text-green-400">{highlightedValue}</span>
     </>
   );
 }
