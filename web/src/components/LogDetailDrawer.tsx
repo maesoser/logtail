@@ -11,6 +11,8 @@ import {
 } from '@phosphor-icons/react';
 import type { LogEntry, LogFilter } from '../types';
 import { getSeverityInfo, getFacilityName, formatTimestamp, formatRelativeTime } from '../types';
+import { isKeyValueContent, parseKeyValueContent } from './kvParsing';
+import type { KeyValuePair } from './kvParsing';
 
 interface LogDetailDrawerProps {
   entry: LogEntry | null;
@@ -33,13 +35,6 @@ function isJsonContent(content: string): boolean {
 // Check if content looks like a stack trace
 function isStackTrace(content: string): boolean {
   return /^\s*(at\s+|Error:|Exception:|Traceback|Caused by:)/m.test(content);
-}
-
-// Key-value pair parsed from log content
-interface KeyValuePair {
-  key: string;
-  value: string;
-  rawValue: string; // Original value including quotes if present
 }
 
 // Token types for syntax highlighting
@@ -190,40 +185,6 @@ function renderTokenizedValue(
   });
 }
 
-// Check if content looks like key=value format (logfmt style)
-// Examples: time="2026-03-19T17:36:23Z" level=error msg="failed to connect"
-function isKeyValueContent(content: string): boolean {
-  // Match pattern: key=value or key="value with spaces"
-  // Need at least 2 key-value pairs to consider it structured
-  const kvPattern = /\b[a-zA-Z_][a-zA-Z0-9_-]*=(?:"[^"]*"|[^\s"]+)/g;
-  const matches = content.match(kvPattern);
-  return matches !== null && matches.length >= 2;
-}
-
-// Parse key=value content into individual pairs
-function parseKeyValueContent(content: string): KeyValuePair[] {
-  const pairs: KeyValuePair[] = [];
-  
-  // Regex to match key=value pairs
-  // Handles: key=value, key="quoted value", key="value with \"escaped\" quotes"
-  const kvRegex = /\b([a-zA-Z_][a-zA-Z0-9_-]*)=((?:"(?:[^"\\]|\\.)*")|(?:[^\s"]+))/g;
-  
-  let match;
-  while ((match = kvRegex.exec(content)) !== null) {
-    const [, key, rawValue] = match;
-    // Remove quotes from value if present
-    let value = rawValue;
-    if (value.startsWith('"') && value.endsWith('"')) {
-      value = value.slice(1, -1);
-      // Unescape escaped characters
-      value = value.replace(/\\(.)/g, '$1');
-    }
-    pairs.push({ key, value, rawValue });
-  }
-  
-  return pairs;
-}
-
 // Highlight a single key-value pair with syntax coloring
 function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.ReactNode {
   const { key, value, rawValue } = pair;
@@ -340,14 +301,61 @@ function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.React
   );
 }
 
-// Render key-value pairs as formatted lines
+// Render key-value pairs interleaved with any free-form text that surrounds
+// or falls between the matched pairs, so no part of the original message is
+// discarded during formatting.
 function KeyValueDisplay({ 
-  pairs, 
+  pairs,
+  rawContent,
   searchTerm 
 }: { 
-  pairs: KeyValuePair[]; 
+  pairs: KeyValuePair[];
+  rawContent: string;
   searchTerm?: string;
 }): React.ReactElement {
+  // Build a flat list of segments: plain text gaps + KV pairs
+  type Segment =
+    | { kind: 'text'; text: string }
+    | { kind: 'kv'; pair: KeyValuePair };
+
+  const segments: Segment[] = [];
+  let cursor = 0;
+
+  for (const pair of pairs) {
+    if (pair.start > cursor) {
+      // Free-form text before this pair
+      segments.push({ kind: 'text', text: rawContent.slice(cursor, pair.start) });
+    }
+    segments.push({ kind: 'kv', pair });
+    cursor = pair.end;
+  }
+
+  // Trailing free-form text after the last pair
+  if (cursor < rawContent.length) {
+    segments.push({ kind: 'text', text: rawContent.slice(cursor) });
+  }
+
+  // If there is any non-empty free-form text, render everything on a single
+  // line so the message reads naturally. Otherwise render each pair on its
+  // own line (classic logfmt layout).
+  const hasFreText = segments.some(
+    (s) => s.kind === 'text' && s.text.trim().length > 0
+  );
+
+  if (hasFreText) {
+    return (
+      <div className="py-0.5">
+        {segments.map((seg, i) =>
+          seg.kind === 'text' ? (
+            <span key={i} className="text-[var(--color-text-primary)]">{seg.text}</span>
+          ) : (
+            <span key={i}>{highlightKeyValue(seg.pair, searchTerm)}</span>
+          )
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
       {pairs.map((pair, index) => (
@@ -729,7 +737,7 @@ export function LogDetailDrawer({
                 {isJson ? (
                   highlightJson(formatted)
                 ) : isKeyValue ? (
-                  <KeyValueDisplay pairs={keyValuePairs} searchTerm={searchTerm} />
+                  <KeyValueDisplay pairs={keyValuePairs} rawContent={entry?.content ?? ''} searchTerm={searchTerm} />
                 ) : (
                   <HighlightSearch text={formatted} searchTerm={searchTerm} />
                 )}
