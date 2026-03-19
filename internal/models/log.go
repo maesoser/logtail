@@ -190,18 +190,21 @@ type Stats struct {
 
 // HistogramConfig defines the time range and bucket size for histogram generation
 type HistogramConfig struct {
-	TotalMinutes  int // Total time range in minutes
-	BucketMinutes int // Size of each bucket in minutes
+	TotalMinutes  int    // Total time range in minutes
+	BucketMinutes int    // Size of each bucket in minutes
+	LabelFormat   string // Go time format string for bucket labels (e.g. "15:04" or "01/02 15")
 }
 
 // Predefined histogram configurations
 var (
 	// HistogramConfig8h: 8 hours in 5-minute buckets (96 buckets)
-	HistogramConfig8h = HistogramConfig{TotalMinutes: 8 * 60, BucketMinutes: 5}
+	HistogramConfig8h = HistogramConfig{TotalMinutes: 8 * 60, BucketMinutes: 5, LabelFormat: "15:04"}
 	// HistogramConfig24h: 24 hours in 10-minute buckets (144 buckets)
-	HistogramConfig24h = HistogramConfig{TotalMinutes: 24 * 60, BucketMinutes: 10}
+	HistogramConfig24h = HistogramConfig{TotalMinutes: 24 * 60, BucketMinutes: 10, LabelFormat: "15:04"}
 	// HistogramConfig5d: 5 days in 60-minute buckets (120 buckets)
-	HistogramConfig5d = HistogramConfig{TotalMinutes: 5 * 24 * 60, BucketMinutes: 60}
+	HistogramConfig5d = HistogramConfig{TotalMinutes: 5 * 24 * 60, BucketMinutes: 60, LabelFormat: "01/02 15:04"}
+	// HistogramConfig21d: 21 days in 180-minute (3-hour) buckets (168 buckets)
+	HistogramConfig21d = HistogramConfig{TotalMinutes: 21 * 24 * 60, BucketMinutes: 180, LabelFormat: "01/02 15:04"}
 )
 
 // GetHistogramConfig returns the appropriate configuration for the given range
@@ -211,6 +214,8 @@ func GetHistogramConfig(rangeStr string) HistogramConfig {
 		return HistogramConfig8h
 	case "5d":
 		return HistogramConfig5d
+	case "21d":
+		return HistogramConfig21d
 	default:
 		return HistogramConfig24h
 	}

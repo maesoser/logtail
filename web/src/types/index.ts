@@ -64,7 +64,7 @@ export interface Stats {
 }
 
 // Time range options for the histogram
-export type TimeRange = '8h' | '24h' | '5d';
+export type TimeRange = '8h' | '24h' | '5d' | '21d';
 
 // Time range configuration
 export interface TimeRangeConfig {
@@ -79,10 +79,11 @@ export const TIME_RANGE_CONFIGS: Record<TimeRange, TimeRangeConfig> = {
   '8h': { value: '8h', label: '8 Hours', bucketMinutes: 5, description: '5-min buckets' },
   '24h': { value: '24h', label: '24 Hours', bucketMinutes: 15, description: '15-min buckets' },
   '5d': { value: '5d', label: '5 Days', bucketMinutes: 60, description: '1-hour buckets' },
+  '21d': { value: '21d', label: '21 Days', bucketMinutes: 180, description: '3-hour buckets' },
 };
 
 // Valid time range values for validation
-export const VALID_TIME_RANGES: TimeRange[] = ['8h', '24h', '5d'];
+export const VALID_TIME_RANGES: TimeRange[] = ['8h', '24h', '5d', '21d'];
 
 // Check if a string is a valid time range
 export function isValidTimeRange(value: string): value is TimeRange {
