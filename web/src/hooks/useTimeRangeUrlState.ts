@@ -7,7 +7,7 @@ const URL_PARAM_KEY = 'range';
 
 /**
  * Hook for managing time range state with URL persistence.
- * The time range is stored in the URL as ?range=8h|24h|5d
+ * The time range is stored in the URL as ?range=8h|24h|5d|21d
  */
 export function useTimeRangeUrlState(): [TimeRange, (range: TimeRange) => void] {
   // Initialize from URL or defaults

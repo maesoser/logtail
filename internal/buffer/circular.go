@@ -477,11 +477,15 @@ func (b *CircularBuffer) GetStats(filter *models.LogFilter, histConfig models.Hi
 	stats.NewestTimestamp = newest
 
 	// Build histogram array (index 0 = current interval, index numBuckets-1 = oldest interval)
+	labelFormat := histConfig.LabelFormat
+	if labelFormat == "" {
+		labelFormat = "15:04"
+	}
 	for i := 0; i < numBuckets; i++ {
 		intervalTime := alignedNow.Add(-time.Duration(i*bucketMinutes) * time.Minute)
 		bucket := intervalBuckets[i]
 		histBucket := models.HistogramBucket{
-			Hour: intervalTime.Format("15:04"),
+			Hour: intervalTime.Format(labelFormat),
 		}
 		if bucket != nil {
 			histBucket.Count = bucket.count

@@ -31,13 +31,31 @@ const SEVERITY_NAME_TO_LEVEL: Record<keyof SeverityCounts, number> = {
   debug: 7,
 };
 
-// Helper to compute the interval start time based on bucket size
+// Helper to compute the interval start time based on bucket size.
+// Handles both "HH:MM" (short ranges) and "MM/DD HH:MM" (multi-day ranges).
 function getIntervalStart(hour: string, bucketMinutes: number): string {
-  const [h, m] = hour.split(':').map(Number);
-  const totalMinutes = h * 60 + m - bucketMinutes;
-  const newHour = Math.floor(totalMinutes / 60) % 24;
-  const newMinute = totalMinutes % 60;
-  return `${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`;
+  const parts = hour.split(' ');
+  const timePart = parts[parts.length - 1]; // "HH:MM" portion
+  const [h, m] = timePart.split(':').map(Number);
+  const totalMinutesFromMidnight = h * 60 + m - bucketMinutes;
+
+  if (parts.length === 1) {
+    // Short format: just return adjusted HH:MM (may wrap across midnight, keep simple)
+    const newHour = Math.floor(((totalMinutesFromMidnight % (24 * 60)) + 24 * 60) / 60) % 24;
+    const newMinute = ((totalMinutesFromMidnight % 60) + 60) % 60;
+    return `${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`;
+  }
+
+  // Multi-day format "MM/DD HH:MM": parse with a reference year to handle day rollover
+  const datePart = parts[0]; // "MM/DD"
+  const [month, day] = datePart.split('/').map(Number);
+  const ref = new Date(Date.UTC(new Date().getUTCFullYear(), month - 1, day, h, m, 0));
+  ref.setUTCMinutes(ref.getUTCMinutes() - bucketMinutes);
+  const mm = (ref.getUTCMonth() + 1).toString().padStart(2, '0');
+  const dd = ref.getUTCDate().toString().padStart(2, '0');
+  const hh = ref.getUTCHours().toString().padStart(2, '0');
+  const mn = ref.getUTCMinutes().toString().padStart(2, '0');
+  return `${mm}/${dd} ${hh}:${mn}`;
 }
 
 // Time range tabs configuration
@@ -61,6 +79,7 @@ function formatTimeRangeLabel(range: TimeRange): string {
     case '8h': return '8h ago';
     case '24h': return '24h ago';
     case '5d': return '5d ago';
+    case '21d': return '21d ago';
   }
 }
 
