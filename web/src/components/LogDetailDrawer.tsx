@@ -35,6 +35,109 @@ function isStackTrace(content: string): boolean {
   return /^\s*(at\s+|Error:|Exception:|Traceback|Caused by:)/m.test(content);
 }
 
+// Key-value pair parsed from log content
+interface KeyValuePair {
+  key: string;
+  value: string;
+  rawValue: string; // Original value including quotes if present
+}
+
+// Check if content looks like key=value format (logfmt style)
+// Examples: time="2026-03-19T17:36:23Z" level=error msg="failed to connect"
+function isKeyValueContent(content: string): boolean {
+  // Match pattern: key=value or key="value with spaces"
+  // Need at least 2 key-value pairs to consider it structured
+  const kvPattern = /\b[a-zA-Z_][a-zA-Z0-9_-]*=(?:"[^"]*"|[^\s"]+)/g;
+  const matches = content.match(kvPattern);
+  return matches !== null && matches.length >= 2;
+}
+
+// Parse key=value content into individual pairs
+function parseKeyValueContent(content: string): KeyValuePair[] {
+  const pairs: KeyValuePair[] = [];
+  
+  // Regex to match key=value pairs
+  // Handles: key=value, key="quoted value", key="value with \"escaped\" quotes"
+  const kvRegex = /\b([a-zA-Z_][a-zA-Z0-9_-]*)=((?:"(?:[^"\\]|\\.)*")|(?:[^\s"]+))/g;
+  
+  let match;
+  while ((match = kvRegex.exec(content)) !== null) {
+    const [, key, rawValue] = match;
+    // Remove quotes from value if present
+    let value = rawValue;
+    if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1);
+      // Unescape escaped characters
+      value = value.replace(/\\(.)/g, '$1');
+    }
+    pairs.push({ key, value, rawValue });
+  }
+  
+  return pairs;
+}
+
+// Highlight a single key-value pair with syntax coloring
+function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.ReactNode {
+  const { key, value, rawValue } = pair;
+  const isQuoted = rawValue.startsWith('"');
+  
+  // Determine value color based on content
+  let valueClass = 'text-green-600 dark:text-green-400'; // Default string color
+  
+  if (!isQuoted) {
+    // Unquoted values - check type
+    if (value === 'true' || value === 'false') {
+      valueClass = 'text-purple-600 dark:text-purple-400';
+    } else if (value === 'null' || value === 'nil') {
+      valueClass = 'text-gray-500';
+    } else if (/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)) {
+      valueClass = 'text-orange-600 dark:text-orange-400';
+    } else if (/^(error|err|fatal|critical|crit)$/i.test(value)) {
+      valueClass = 'text-red-600 dark:text-red-400';
+    } else if (/^(warn|warning)$/i.test(value)) {
+      valueClass = 'text-amber-600 dark:text-amber-400';
+    } else if (/^(info|notice)$/i.test(value)) {
+      valueClass = 'text-blue-600 dark:text-blue-400';
+    } else if (/^(debug|trace)$/i.test(value)) {
+      valueClass = 'text-gray-500 dark:text-gray-400';
+    }
+  }
+  
+  // Apply search highlighting to value if needed
+  const highlightedValue = searchTerm ? (
+    <HighlightSearch text={isQuoted ? `"${value}"` : value} searchTerm={searchTerm} />
+  ) : (
+    isQuoted ? `"${value}"` : value
+  );
+  
+  return (
+    <>
+      <span className="text-blue-600 dark:text-blue-400">{key}</span>
+      <span className="text-kumo-subtle">=</span>
+      <span className={valueClass}>{highlightedValue}</span>
+    </>
+  );
+}
+
+// Render key-value pairs as formatted lines
+function KeyValueDisplay({ 
+  pairs, 
+  searchTerm 
+}: { 
+  pairs: KeyValuePair[]; 
+  searchTerm?: string;
+}): React.ReactElement {
+  return (
+    <>
+      {pairs.map((pair, index) => (
+        <div key={index} className="py-0.5">
+          {highlightKeyValue(pair, searchTerm)}
+        </div>
+      ))}
+    </>
+  );
+}
+
 // Try to parse and format JSON
 function tryFormatJson(content: string): { formatted: string; isJson: boolean } {
   if (!isJsonContent(content)) {
@@ -148,6 +251,20 @@ export function LogDetailDrawer({
     if (!entry || isJson) return false;
     return isStackTrace(entry.content);
   }, [entry, isJson]);
+  
+  // Check for key-value format (logfmt style)
+  const { isKeyValue, keyValuePairs } = useMemo(() => {
+    if (!entry || isJson || isStack) {
+      return { isKeyValue: false, keyValuePairs: [] };
+    }
+    if (isKeyValueContent(entry.content)) {
+      return { 
+        isKeyValue: true, 
+        keyValuePairs: parseKeyValueContent(entry.content) 
+      };
+    }
+    return { isKeyValue: false, keyValuePairs: [] };
+  }, [entry, isJson, isStack]);
   
   // Keyboard navigation
   useEffect(() => {
@@ -322,13 +439,21 @@ export function LogDetailDrawer({
                       JSON
                     </span>
                   )}
+                  {isKeyValue && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                      Key-Value
+                    </span>
+                  )}
                   {isStack && (
                     <span className="text-xs px-1.5 py-0.5 rounded bg-kumo-danger-tint text-kumo-danger">
                       Stack Trace
                     </span>
                   )}
                   <span className="text-xs text-kumo-inactive">
-                    {lineCount} {lineCount === 1 ? 'line' : 'lines'}
+                    {isKeyValue 
+                      ? `${keyValuePairs.length} ${keyValuePairs.length === 1 ? 'field' : 'fields'}`
+                      : `${lineCount} ${lineCount === 1 ? 'line' : 'lines'}`
+                    }
                   </span>
                 </div>
                 
@@ -380,7 +505,13 @@ export function LogDetailDrawer({
                 max-h-96 overflow-y-auto
                 ${isStack ? 'text-kumo-danger' : 'text-kumo-default'}
               `}>
-                {isJson ? highlightJson(formatted) : <HighlightSearch text={formatted} searchTerm={searchTerm} />}
+                {isJson ? (
+                  highlightJson(formatted)
+                ) : isKeyValue ? (
+                  <KeyValueDisplay pairs={keyValuePairs} searchTerm={searchTerm} />
+                ) : (
+                  <HighlightSearch text={formatted} searchTerm={searchTerm} />
+                )}
               </pre>
             </div>
           </div>
