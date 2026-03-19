@@ -139,6 +139,39 @@ export const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: 'content', label: 'Content', visible: true, monospace: true },
 ];
 
+// Syslog facility names (RFC 3164)
+export const FACILITY_NAMES: Record<number, string> = {
+  0:  'kern',
+  1:  'user',
+  2:  'mail',
+  3:  'daemon',
+  4:  'authpriv',
+  5:  'syslogd',
+  6:  'printer',
+  7:  'network',
+  8:  'UUCP',
+  9:  'cron',
+  10: 'auth',
+  11: 'ftp',
+  12: 'ntp',
+  13: 'audit',
+  14: 'alert',
+  15: 'cron',
+  16: 'local0',
+  17: 'local1',
+  18: 'local2',
+  19: 'local3',
+  20: 'local4',
+  21: 'local5',
+  22: 'local6',
+  23: 'local7',
+};
+
+// Get facility name with numeric fallback
+export function getFacilityName(facility: number): string {
+  return FACILITY_NAMES[facility] ?? String(facility);
+}
+
 // Severity level names and colors
 export const SEVERITY_LEVELS: Record<number, { name: string; color: string; bgColor: string }> = {
   0: { name: 'emergency', color: '#FFFFFF', bgColor: '#991B1B' },
