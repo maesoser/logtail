@@ -639,7 +639,7 @@ export function LogDetailDrawer({
                 />
                 <MetadataItem
                   label="Facility"
-                  value={getFacilityName(entry.facility)}
+                  value={`${getFacilityName(entry.facility)} (${entry.facility})`}
                 />
                 <MetadataItem
                   label="Priority"
