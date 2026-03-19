@@ -286,6 +286,54 @@ func (h *Handlers) HandleGetUniqueValues(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(map[string][]string{"values": values})
 }
 
+// HandleGetTopStats handles GET /api/top
+// Returns the top N values for hostnames, tags, clients, and severity distribution
+func (h *Handlers) HandleGetTopStats(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	// Parse filter parameters (same as other endpoints)
+	filter := models.LogFilter{
+		Client:   filterEmptyStrings(query["client"]),
+		Hostname: filterEmptyStrings(query["hostname"]),
+		Tag:      filterEmptyStrings(query["tag"]),
+		Content:  query.Get("content"),
+	}
+
+	// Parse severity filter
+	if severityStr := query.Get("severity"); severityStr != "" {
+		for _, s := range query["severity"] {
+			if level, err := strconv.Atoi(s); err == nil && level >= 0 && level <= 7 {
+				filter.Severity = append(filter.Severity, level)
+			}
+		}
+	}
+
+	// Parse time range
+	if fromStr := query.Get("from"); fromStr != "" {
+		if from, err := time.Parse(time.RFC3339, fromStr); err == nil {
+			filter.From = &from
+		}
+	}
+	if toStr := query.Get("to"); toStr != "" {
+		if to, err := time.Parse(time.RFC3339, toStr); err == nil {
+			filter.To = &to
+		}
+	}
+
+	// Parse limit (default: 10, max: 50)
+	limit := 10
+	if limitStr := query.Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 50 {
+			limit = l
+		}
+	}
+
+	stats := h.Buffer.GetTopStats(&filter, limit)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}
+
 // HandleWebSocket handles WebSocket connections
 func (h *Handlers) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	h.Hub.ServeWS(w, r)

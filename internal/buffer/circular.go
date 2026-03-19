@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -580,4 +581,112 @@ func (b *CircularBuffer) GetUniqueValues(field string) []string {
 	}
 
 	return values
+}
+
+// GetTopStats returns the top N values for hostnames, tags, clients, and severity distribution.
+// The filter parameter allows filtering the entries before calculating stats.
+// The limit parameter specifies how many top values to return for each field.
+func (b *CircularBuffer) GetTopStats(filter *models.LogFilter, limit int) models.TopStats {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	if limit <= 0 {
+		limit = 10
+	}
+
+	// Count maps for each field
+	hostnameCounts := make(map[string]int)
+	tagCounts := make(map[string]int)
+	clientCounts := make(map[string]int)
+	severityCounts := make(map[int]int)
+	totalMatched := 0
+
+	// Check if we have any filter criteria
+	hasFilter := filter != nil && (len(filter.Client) > 0 || len(filter.Hostname) > 0 ||
+		len(filter.Tag) > 0 || filter.Content != "" || len(filter.Severity) > 0 ||
+		filter.From != nil || filter.To != nil)
+
+	// Iterate through all entries
+	for i := 0; i < b.count; i++ {
+		idx := (b.tail + i) % b.capacity
+		entry := b.entries[idx]
+
+		// Apply filter if provided
+		if hasFilter && !b.matchesFilter(entry, *filter) {
+			continue
+		}
+
+		totalMatched++
+
+		// Count hostnames
+		if entry.Hostname != "" {
+			hostnameCounts[entry.Hostname]++
+		}
+
+		// Count tags
+		if entry.Tag != "" {
+			tagCounts[entry.Tag]++
+		}
+
+		// Count clients
+		if entry.Client != "" {
+			clientCounts[entry.Client]++
+		}
+
+		// Count severities
+		if entry.Severity >= 0 && entry.Severity <= 7 {
+			severityCounts[entry.Severity]++
+		}
+	}
+
+	// Convert maps to sorted slices
+	stats := models.TopStats{
+		Hostnames:  topNFromMap(hostnameCounts, limit),
+		Tags:       topNFromMap(tagCounts, limit),
+		Clients:    topNFromMap(clientCounts, limit),
+		Severities: topSeverities(severityCounts),
+		Total:      totalMatched,
+	}
+
+	return stats
+}
+
+// topNFromMap converts a count map to a sorted slice of TopValueItem, returning top N
+func topNFromMap(counts map[string]int, limit int) []models.TopValueItem {
+	// Convert map to slice
+	items := make([]models.TopValueItem, 0, len(counts))
+	for value, count := range counts {
+		items = append(items, models.TopValueItem{Value: value, Count: count})
+	}
+
+	// Sort by count descending
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Count > items[j].Count
+	})
+
+	// Return top N
+	if len(items) > limit {
+		items = items[:limit]
+	}
+
+	return items
+}
+
+// topSeverities converts severity counts to a sorted slice of TopSeverityItem
+func topSeverities(counts map[int]int) []models.TopSeverityItem {
+	items := make([]models.TopSeverityItem, 0, len(counts))
+	for level, count := range counts {
+		items = append(items, models.TopSeverityItem{
+			Level: level,
+			Name:  models.SeverityName(level),
+			Count: count,
+		})
+	}
+
+	// Sort by count descending
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Count > items[j].Count
+	})
+
+	return items
 }

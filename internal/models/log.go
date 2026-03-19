@@ -216,6 +216,28 @@ func GetHistogramConfig(rangeStr string) HistogramConfig {
 	}
 }
 
+// TopValueItem represents a single item in a top-N list
+type TopValueItem struct {
+	Value string `json:"value"`
+	Count int    `json:"count"`
+}
+
+// TopSeverityItem represents a severity level with its count
+type TopSeverityItem struct {
+	Level int    `json:"level"`
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// TopStats contains the top values for each field
+type TopStats struct {
+	Hostnames  []TopValueItem    `json:"hostnames"`
+	Tags       []TopValueItem    `json:"tags"`
+	Clients    []TopValueItem    `json:"clients"`
+	Severities []TopSeverityItem `json:"severities"`
+	Total      int               `json:"total"`
+}
+
 // WebSocketMessage represents a message sent over WebSocket
 type WebSocketMessage struct {
 	Type    string      `json:"type"`

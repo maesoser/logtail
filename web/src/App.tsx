@@ -4,10 +4,12 @@ import {
   LightningIcon, 
   ArrowClockwiseIcon,
   SunIcon,
-  MoonIcon
+  MoonIcon,
+  ChartBarIcon
 } from '@phosphor-icons/react';
 import { useLogs, useWebSocket } from './hooks/useLogs';
 import { useStats, useUniqueValues } from './hooks/useStats';
+import { useTopStats } from './hooks/useTopStats';
 import { useDarkMode } from './hooks/useDarkMode';
 import { usePersistedColumns } from './hooks/usePersistedColumns';
 import { useIsMobile } from './hooks/useMediaQuery';
@@ -17,8 +19,9 @@ import { ActivityHistogram, ActivityHistogramCompact } from './components/Activi
 import { FilterPanel } from './components/FilterPanel';
 import { LogTable } from './components/LogTable';
 import { LogDetailDrawer } from './components/LogDetailDrawer';
+import { StatsSidebar } from './components/StatsSidebar';
 import { Settings } from './components/Settings';
-import type { LogFilter, LogEntry } from './types';
+import type { LogFilter, LogEntry, TopStats } from './types';
 
 function App() {
   // Dark mode
@@ -43,9 +46,13 @@ function App() {
   const [selectedEntry, setSelectedEntry] = useState<LogEntry | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   
+  // Stats sidebar state
+  const [statsSidebarOpen, setStatsSidebarOpen] = useState(false);
+  
   // Fetch data
   const { data: logsData, loading: logsLoading, refetch: refetchLogs } = useLogs(filter);
   const { stats, refetch: refetchStats } = useStats(10000, filter, timeRange);
+  const { data: topStats, loading: topStatsLoading, refetch: refetchTopStats, updateFromWebSocket: updateTopStats } = useTopStats(filter);
   
   // Fetch unique values for filter dropdowns
   const { values: uniqueClients } = useUniqueValues('client');
@@ -60,8 +67,16 @@ function App() {
     });
   }, []);
   
+  // Handle top stats updates from WebSocket
+  const handleTopStatsUpdate = useCallback((topStats: TopStats) => {
+    updateTopStats(topStats);
+  }, [updateTopStats]);
+  
   // WebSocket connection
-  const { connected } = useWebSocket(handleNewLogEntry);
+  const { connected } = useWebSocket({ 
+    onLogEntry: handleNewLogEntry,
+    onTopStats: handleTopStatsUpdate
+  });
   
   // Combine real-time entries with fetched entries when on first page with no filters
   const displayEntries = useMemo(() => {
@@ -97,7 +112,8 @@ function App() {
   const handleRefresh = useCallback(() => {
     refetchLogs();
     refetchStats();
-  }, [refetchLogs, refetchStats]);
+    refetchTopStats();
+  }, [refetchLogs, refetchStats, refetchTopStats]);
   
   // Handle histogram bucket click to filter by time range
   const handleHistogramBucketClick = useCallback((from: string, to: string) => {
@@ -137,8 +153,7 @@ function App() {
   const canNavigateNext = selectedEntryIndex >= 0 && selectedEntryIndex < displayEntries.length - 1;
 
   return (
-    <div className="min-h-screen color-kumo-base
- text-kumo-default">
+    <div className="min-h-screen bg-kumo-base text-kumo-default flex flex-col">
       {/* Header */}
       <header className="bg-kumo-base border-b border-kumo-line sticky top-0 z-10">
         <div className="mx-auto px-4 md:px-6 py-3 md:py-4">
@@ -163,6 +178,18 @@ function App() {
                 {!isMobile && 'Refresh'}
               </Button>
               
+              {/* Stats sidebar toggle - hide on mobile */}
+              {!isMobile && (
+                <Button
+                  variant={statsSidebarOpen ? 'primary' : 'outline'}
+                  onClick={() => setStatsSidebarOpen(!statsSidebarOpen)}
+                  shape="square"
+                  aria-label={statsSidebarOpen ? 'Close stats sidebar' : 'Open stats sidebar'}
+                >
+                  <ChartBarIcon size={16} />
+                </Button>
+              )}
+              
               {/* Settings - hide on mobile */}
               {!isMobile && (
                 <Settings
@@ -186,55 +213,70 @@ function App() {
         </div>
       </header>
 
-      <main className="px-4 py-4 space-y-4">
-        {/* Activity Histogram */}
-        {stats && stats.histogram.length > 0 && (
-          isMobile ? (
-            <div className="bg-kumo-base border border-kumo-line rounded p-3">
-              <h3 className="text-sm font-semibold mb-2 text-kumo-default">Recent Activity</h3>
-              <ActivityHistogramCompact data={stats.histogram} />
-            </div>
-          ) : (
-            <ActivityHistogram 
-              data={stats.histogram}
-              bucketMinutes={stats.bucketMinutes}
-              timeRange={timeRange}
-              onTimeRangeChange={setTimeRange}
-              onBucketClick={handleHistogramBucketClick}
+      <div className="flex flex-1 overflow-hidden">
+        <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {/* Activity Histogram */}
+          {stats && stats.histogram.length > 0 && (
+            isMobile ? (
+              <div className="bg-kumo-base border border-kumo-line rounded p-3">
+                <h3 className="text-sm font-semibold mb-2 text-kumo-default">Recent Activity</h3>
+                <ActivityHistogramCompact data={stats.histogram} />
+              </div>
+            ) : (
+              <ActivityHistogram 
+                data={stats.histogram}
+                bucketMinutes={stats.bucketMinutes}
+                timeRange={timeRange}
+                onTimeRangeChange={setTimeRange}
+                onBucketClick={handleHistogramBucketClick}
+              />
+            )
+          )}
+
+          {/* Filter Panel */}
+          <FilterPanel
+            filter={filter}
+            onFilterChange={handleFilterChange}
+            uniqueClients={uniqueClients}
+            uniqueHostnames={uniqueHostnames}
+            uniqueTags={uniqueTags}
+            stats={stats}
+            connected={connected}
+            realtimeCount={realtimeEntries.length}
+            isMobile={isMobile}
+          />
+
+          {/* Log Table */}
+          <LogTable
+            entries={displayEntries}
+            columns={columns}
+            loading={logsLoading}
+            page={filter.page || 1}
+            totalPages={logsData?.totalPages || 1}
+            totalCount={logsData?.totalCount || 0}
+            limit={filter.limit || 50}
+            onPageChange={handlePageChange}
+            onLimitChange={handleLimitChange}
+            onEntrySelect={handleEntrySelect}
+            onColumnsChange={setColumns}
+            searchTerm={filter.content}
+            isMobile={isMobile}
+          />
+        </main>
+        
+        {/* Stats Sidebar */}
+        {!isMobile && (
+          <div className={`overflow-hidden transition-all duration-200 ${statsSidebarOpen ? 'w-72' : 'w-0'}`}>
+            <StatsSidebar
+              topStats={topStats}
+              loading={topStatsLoading}
+              open={statsSidebarOpen}
+              onClose={() => setStatsSidebarOpen(false)}
+              onFilterBy={handleQuickFilter}
             />
-          )
+          </div>
         )}
-
-        {/* Filter Panel */}
-        <FilterPanel
-          filter={filter}
-          onFilterChange={handleFilterChange}
-          uniqueClients={uniqueClients}
-          uniqueHostnames={uniqueHostnames}
-          uniqueTags={uniqueTags}
-          stats={stats}
-          connected={connected}
-          realtimeCount={realtimeEntries.length}
-          isMobile={isMobile}
-        />
-
-        {/* Log Table */}
-        <LogTable
-          entries={displayEntries}
-          columns={columns}
-          loading={logsLoading}
-          page={filter.page || 1}
-          totalPages={logsData?.totalPages || 1}
-          totalCount={logsData?.totalCount || 0}
-          limit={filter.limit || 50}
-          onPageChange={handlePageChange}
-          onLimitChange={handleLimitChange}
-          onEntrySelect={handleEntrySelect}
-          onColumnsChange={setColumns}
-          searchTerm={filter.content}
-          isMobile={isMobile}
-        />
-      </main>
+      </div>
       
       {/* Log Detail Drawer */}
       <LogDetailDrawer

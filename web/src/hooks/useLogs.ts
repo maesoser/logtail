@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { LogEntry, LogFilter, LogQueryResult } from '../types';
+import type { LogEntry, LogFilter, LogQueryResult, TopStats } from '../types';
 
 const API_BASE = '';
 
@@ -53,7 +53,12 @@ export function useLogs(filter: LogFilter) {
   return { data, loading, error, refetch: fetchLogs };
 }
 
-export function useWebSocket(onLogEntry: (entry: LogEntry) => void) {
+interface WebSocketCallbacks {
+  onLogEntry: (entry: LogEntry) => void;
+  onTopStats?: (topStats: TopStats) => void;
+}
+
+export function useWebSocket({ onLogEntry, onTopStats }: WebSocketCallbacks) {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -84,6 +89,8 @@ export function useWebSocket(onLogEntry: (entry: LogEntry) => void) {
             const message = JSON.parse(msgStr);
             if (message.type === 'log_entry') {
               onLogEntry(message.payload as LogEntry);
+            } else if (message.type === 'top_stats' && onTopStats) {
+              onTopStats(message.payload as TopStats);
             }
           }
         } catch (err) {
@@ -114,7 +121,7 @@ export function useWebSocket(onLogEntry: (entry: LogEntry) => void) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect');
     }
-  }, [onLogEntry]);
+  }, [onLogEntry, onTopStats]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

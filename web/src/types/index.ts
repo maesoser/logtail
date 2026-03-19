@@ -89,10 +89,32 @@ export function isValidTimeRange(value: string): value is TimeRange {
   return VALID_TIME_RANGES.includes(value as TimeRange);
 }
 
+// Top value item for stats sidebar
+export interface TopValueItem {
+  value: string;
+  count: number;
+}
+
+// Top severity item for stats sidebar
+export interface TopSeverityItem {
+  level: number;
+  name: string;
+  count: number;
+}
+
+// Top stats response from /api/top
+export interface TopStats {
+  hostnames: TopValueItem[];
+  tags: TopValueItem[];
+  clients: TopValueItem[];
+  severities: TopSeverityItem[];
+  total: number;
+}
+
 // WebSocket message types
 export interface WebSocketMessage {
-  type: 'log_entry' | 'stats';
-  payload: LogEntry | Stats;
+  type: 'log_entry' | 'stats' | 'top_stats';
+  payload: LogEntry | Stats | TopStats;
 }
 
 // Column configuration for the log table

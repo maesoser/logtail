@@ -129,6 +129,22 @@ func (h *Hub) BroadcastStats(stats models.Stats) {
 	h.broadcast <- data
 }
 
+// BroadcastTopStats sends updated top stats to all connected clients
+func (h *Hub) BroadcastTopStats(topStats models.TopStats) {
+	msg := models.WebSocketMessage{
+		Type:    "top_stats",
+		Payload: topStats,
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("Error marshaling top_stats message: %v", err)
+		return
+	}
+
+	h.broadcast <- data
+}
+
 // ClientCount returns the number of connected clients
 func (h *Hub) ClientCount() int {
 	h.mu.RLock()

@@ -46,6 +46,7 @@ func NewRouter(buf *buffer.CircularBuffer, hub *websocket.Hub, webAssets embed.F
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/logs", handlers.HandleGetLogs)
 		r.Get("/stats", handlers.HandleGetStats)
+		r.Get("/top", handlers.HandleGetTopStats)
 		r.Get("/values", handlers.HandleGetUniqueValues)
 		r.Get("/config", handlers.HandleGetConfig)
 		r.Put("/config", handlers.HandleUpdateConfig)
