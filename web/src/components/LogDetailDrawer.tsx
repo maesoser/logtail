@@ -10,7 +10,7 @@ import {
   CheckCircleIcon 
 } from '@phosphor-icons/react';
 import type { LogEntry, LogFilter } from '../types';
-import { getSeverityInfo, formatTimestamp, formatRelativeTime } from '../types';
+import { getSeverityInfo, getFacilityName, formatTimestamp, formatRelativeTime } from '../types';
 
 interface LogDetailDrawerProps {
   entry: LogEntry | null;
@@ -639,7 +639,7 @@ export function LogDetailDrawer({
                 />
                 <MetadataItem
                   label="Facility"
-                  value={String(entry.facility)}
+                  value={getFacilityName(entry.facility)}
                 />
                 <MetadataItem
                   label="Priority"

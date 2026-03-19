@@ -2,7 +2,7 @@ import { useCallback, useState, useRef, useEffect } from 'react';
 import { Table, Pagination, Empty, Loader } from '@cloudflare/kumo';
 import { ListDashesIcon, DotsSixVerticalIcon } from '@phosphor-icons/react';
 import type { LogEntry, ColumnConfig } from '../types';
-import { getSeverityInfo, formatTimestamp } from '../types';
+import { getSeverityInfo, getFacilityName, formatTimestamp } from '../types';
 import { HighlightedText } from './HighlightedText';
 
 interface LogTableProps {
@@ -200,6 +200,13 @@ export function LogTable({
           </span>
         );
       }
+
+      case 'facility':
+        return (
+          <span className="text-xs text-kumo-strong" title={String(value)}>
+            {getFacilityName(value as number)}
+          </span>
+        );
 
       case 'priority':
         return (
