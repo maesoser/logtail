@@ -45,6 +45,16 @@ export function FilterPanel({
     return () => clearTimeout(timer);
   }, [debouncedContent, localFilter, onFilterChange]);
 
+  // Sync local state when filter prop changes (from histogram click, quick filters, etc.)
+  useEffect(() => {
+    setLocalFilter(filter);
+    setDateRange({
+      from: filter.from ? new Date(filter.from) : undefined,
+      to: filter.to ? new Date(filter.to) : undefined,
+    });
+    setDebouncedContent(filter.content || '');
+  }, [filter]);
+
   const handleFieldChange = useCallback((field: keyof LogFilter, value: string | string[]) => {
     const isEmpty = Array.isArray(value) ? value.length === 0 : !value;
     const newFilter = { ...localFilter, [field]: isEmpty ? undefined : value, page: 1 };

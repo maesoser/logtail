@@ -198,9 +198,9 @@ type HistogramConfig struct {
 var (
 	// HistogramConfig8h: 8 hours in 5-minute buckets (96 buckets)
 	HistogramConfig8h = HistogramConfig{TotalMinutes: 8 * 60, BucketMinutes: 5}
-	// HistogramConfig24h: 24 hours in 15-minute buckets (96 buckets)
-	HistogramConfig24h = HistogramConfig{TotalMinutes: 24 * 60, BucketMinutes: 15}
-	// HistogramConfig5d: 5 days in 1-hour buckets (120 buckets)
+	// HistogramConfig24h: 24 hours in 10-minute buckets (144 buckets)
+	HistogramConfig24h = HistogramConfig{TotalMinutes: 24 * 60, BucketMinutes: 10}
+	// HistogramConfig5d: 5 days in 60-minute buckets (120 buckets)
 	HistogramConfig5d = HistogramConfig{TotalMinutes: 5 * 24 * 60, BucketMinutes: 60}
 )
 

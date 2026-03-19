@@ -31,11 +31,10 @@ const SEVERITY_NAME_TO_LEVEL: Record<keyof SeverityCounts, number> = {
   debug: 7,
 };
 
-// Helper to compute the interval end time based on bucket size
-function getIntervalEnd(hour: string, bucketMinutes: number): string {
+// Helper to compute the interval start time based on bucket size
+function getIntervalStart(hour: string, bucketMinutes: number): string {
   const [h, m] = hour.split(':').map(Number);
-  const endMinutes = m + bucketMinutes;
-  const totalMinutes = h * 60 + endMinutes;
+  const totalMinutes = h * 60 + m - bucketMinutes;
   const newHour = Math.floor(totalMinutes / 60) % 24;
   const newMinute = totalMinutes % 60;
   return `${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`;
@@ -82,10 +81,10 @@ function computeBucketTimeRange(
   // bars[0] is oldest, bars[totalBars-1] is most recent (closest to now)
   const bucketsFromNow = totalBars - 1 - barIndex;
   
-  // The most recent bucket ends at alignedNow + bucketMinutes (covering "now")
-  const bucketEnd = new Date(alignedNow.getTime() + bucketMinutes * 60 * 1000 - bucketsFromNow * bucketMinutes * 60 * 1000);
+  // The bucket start is bucketsFromNow intervals before alignedNow
+  const bucketEnd = new Date(alignedNow.getTime() - bucketsFromNow * bucketMinutes * 60 * 1000);
   const bucketStart = new Date(bucketEnd.getTime() - bucketMinutes * 60 * 1000);
-  
+
   return { from: bucketStart, to: bucketEnd };
 }
 
@@ -172,7 +171,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
                 }))
               : [];
 
-            const intervalEnd = getIntervalEnd(bar.hour, bucketMinutes);
+            const intervalStart = getIntervalStart(bar.hour, bucketMinutes);
             
             return (
               <Popover.Root key={bar.index}>
@@ -190,8 +189,8 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
                       style={{ 
                         height: `${Math.max(segment.height, segIdx === 0 ? 1 : 0)}px`,
                         backgroundColor: segment.color,
-                        borderTopLeftRadius: segIdx === segments.length - 1 ? 2 : 0,
-                        borderTopRightRadius: segIdx === segments.length - 1 ? 2 : 0,
+                        borderTopLeftRadius: segIdx === 0 ? 2 : 0,
+                        borderTopRightRadius: segIdx === 0 ? 2 : 0,
                         borderBottomLeftRadius: 0,
                         borderBottomRightRadius: 0,
                       }}
@@ -202,7 +201,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
                   <Popover.Positioner side="bottom" align="center" collisionPadding={8} sideOffset={8}>
                     <Popover.Popup className="min-w-[160px] flex flex-col rounded-lg bg-kumo-elevated px-4 py-3 text-sm shadow-lg border border-kumo-line">
                       <Popover.Title className="text-sm font-semibold text-kumo-default">
-                        {bar.hour} - {intervalEnd}
+                        {intervalStart} - {bar.hour}
                       </Popover.Title>
                       <Popover.Description className="text-sm text-kumo-strong">
                         <span className="font-medium">{bar.count.toLocaleString()}</span> events
