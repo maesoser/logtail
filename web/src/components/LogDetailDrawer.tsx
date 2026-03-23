@@ -650,7 +650,7 @@ export function LogDetailDrawer({
     <Drawer.Root open={open} onOpenChange={onOpenChange} modal>
       <Drawer.Portal>
         <Drawer.Backdrop 
-          className="fixed inset-0 z-50 bg-kumo-contrast/50 transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" 
+          className="fixed inset-0 z-50 bg-black/50 transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" 
         />
         <Drawer.Popup
           className="fixed top-0 right-0 z-50 h-full w-full max-w-xl bg-kumo-base shadow-xl flex flex-col transition-transform duration-200 data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full"
