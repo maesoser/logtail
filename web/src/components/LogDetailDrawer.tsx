@@ -38,7 +38,7 @@ function isStackTrace(content: string): boolean {
 }
 
 // Token types for syntax highlighting
-type TokenType = 'uuid' | 'timestamp' | 'url' | 'ip' | 'text';
+type TokenType = 'uuid' | 'timestamp' | 'url' | 'ip' | 'text' | 'bracket' | 'level-error' | 'level-warn' | 'level-info' | 'level-debug' | 'component';
 
 interface Token {
   type: TokenType;
@@ -72,6 +72,12 @@ const TOKEN_COLORS: Record<TokenType, string> = {
   url: 'text-teal-600 dark:text-teal-400',
   ip: 'text-sky-600 dark:text-sky-400',
   text: 'text-green-600 dark:text-green-400', // Default string color
+  bracket: 'text-kumo-subtle',
+  'level-error': 'text-red-600 dark:text-red-400',
+  'level-warn': 'text-amber-600 dark:text-amber-400',
+  'level-info': 'text-blue-600 dark:text-blue-400',
+  'level-debug': 'text-gray-500 dark:text-gray-400',
+  component: 'text-violet-600 dark:text-violet-400',
 };
 
 // Tokenize a value string, finding all special patterns
@@ -365,6 +371,108 @@ function KeyValueDisplay({
       ))}
     </>
   );
+}
+
+// Classify the inner text of a [...] bracket group
+function classifyBracketContent(inner: string): TokenType {
+  const trimmed = inner.trim();
+  // Log level keywords (exact match, case-insensitive)
+  if (/^(emergency|emerg)$/i.test(trimmed)) return 'level-error';
+  if (/^(alert)$/i.test(trimmed)) return 'level-error';
+  if (/^(critical|crit)$/i.test(trimmed)) return 'level-error';
+  if (/^(error|err|fatal)$/i.test(trimmed)) return 'level-error';
+  if (/^(warning|warn)$/i.test(trimmed)) return 'level-warn';
+  if (/^(notice|info|information)$/i.test(trimmed)) return 'level-info';
+  if (/^(debug|trace|verbose)$/i.test(trimmed)) return 'level-debug';
+
+  // Date/time heuristic: contains digits and separators like spaces, colons, dashes, +/-
+  // e.g. "2026-03-22 20:41:53 +00:00"
+  if (/^\d{4}[-/]\d{2}[-/]\d{2}/.test(trimmed)) return 'timestamp';
+
+  // Everything else (component, subsystem name, etc.)
+  return 'component';
+}
+
+// Highlight plain-text log lines by recognising [...] groups and special value patterns
+function highlightPlainText(content: string, searchTerm?: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  // Regex captures: [1] opening bracket, [2] inner text, [3] closing bracket
+  const bracketRegex = /(\[)([^\]]*)(\])/g;
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = bracketRegex.exec(content)) !== null) {
+    const [fullMatch, open, inner, close] = match;
+
+    // Render the text segment before this bracket group
+    if (match.index > lastIndex) {
+      const segment = content.slice(lastIndex, match.index);
+      // Run the free-text segment through tokenizeValue to colour IPs, URLs, etc.
+      const segTokens = tokenizeValue(segment);
+      segTokens.forEach((tok) => {
+        const cls = tok.type === 'text' ? '' : TOKEN_COLORS[tok.type];
+        if (searchTerm) {
+          parts.push(
+            <span key={key++} className={cls || undefined}>
+              <HighlightSearch text={tok.value} searchTerm={searchTerm} />
+            </span>
+          );
+        } else if (cls) {
+          parts.push(<span key={key++} className={cls}>{tok.value}</span>);
+        } else {
+          parts.push(<React.Fragment key={key++}>{tok.value}</React.Fragment>);
+        }
+      });
+    }
+
+    // Opening bracket
+    parts.push(
+      <span key={key++} className={TOKEN_COLORS['bracket']}>{open}</span>
+    );
+
+    // Inner content — classify and colour
+    const innerType = classifyBracketContent(inner);
+    const innerClass = TOKEN_COLORS[innerType];
+    if (searchTerm) {
+      parts.push(
+        <span key={key++} className={innerClass}>
+          <HighlightSearch text={inner} searchTerm={searchTerm} />
+        </span>
+      );
+    } else {
+      parts.push(<span key={key++} className={innerClass}>{inner}</span>);
+    }
+
+    // Closing bracket
+    parts.push(
+      <span key={key++} className={TOKEN_COLORS['bracket']}>{close}</span>
+    );
+
+    lastIndex = match.index + fullMatch.length;
+  }
+
+  // Render any remaining text after the last bracket group
+  if (lastIndex < content.length) {
+    const tail = content.slice(lastIndex);
+    const tailTokens = tokenizeValue(tail);
+    tailTokens.forEach((tok) => {
+      const cls = tok.type === 'text' ? '' : TOKEN_COLORS[tok.type];
+      if (searchTerm) {
+        parts.push(
+          <span key={key++} className={cls || undefined}>
+            <HighlightSearch text={tok.value} searchTerm={searchTerm} />
+          </span>
+        );
+      } else if (cls) {
+        parts.push(<span key={key++} className={cls}>{tok.value}</span>);
+      } else {
+        parts.push(<React.Fragment key={key++}>{tok.value}</React.Fragment>);
+      }
+    });
+  }
+
+  return <>{parts}</>;
 }
 
 // Try to parse and format JSON
@@ -678,6 +786,11 @@ export function LogDetailDrawer({
                       Stack Trace
                     </span>
                   )}
+                  {!isJson && !isKeyValue && !isStack && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-kumo-fill text-kumo-subtle">
+                      Plain Text
+                    </span>
+                  )}
                   <span className="text-xs text-kumo-inactive">
                     {isKeyValue 
                       ? `${keyValuePairs.length} ${keyValuePairs.length === 1 ? 'field' : 'fields'}`
@@ -738,8 +851,10 @@ export function LogDetailDrawer({
                   highlightJson(formatted)
                 ) : isKeyValue ? (
                   <KeyValueDisplay pairs={keyValuePairs} rawContent={entry?.content ?? ''} searchTerm={searchTerm} />
-                ) : (
+                ) : isStack ? (
                   <HighlightSearch text={formatted} searchTerm={searchTerm} />
+                ) : (
+                  highlightPlainText(formatted, searchTerm)
                 )}
               </pre>
             </div>
