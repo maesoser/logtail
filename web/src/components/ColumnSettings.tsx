@@ -51,7 +51,7 @@ export function ColumnSettings({
       />
       <Dialog className="p-6" size="sm">
         <div className="flex items-start justify-between gap-4 mb-4">
-          <Dialog.Title className="text-xl font-semibold text-kumo-default">
+          <Dialog.Title className="text-xl font-medium text-kumo-default">
             Configure Columns
           </Dialog.Title>
           <Dialog.Close

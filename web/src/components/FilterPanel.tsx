@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Input, Button, DatePicker, Popover, Badge, Text, Select, Combobox } from '@cloudflare/kumo';
+import { CornerBrackets } from './CornerBrackets';
 import { MagnifyingGlassIcon, XIcon, CalendarDotsIcon, FunnelIcon, DatabaseIcon, ClockIcon, WifiHighIcon, WifiSlashIcon } from '@phosphor-icons/react';
 import type { LogFilter, Stats } from '../types';
 import { SEVERITY_LEVELS, formatRelativeTime } from '../types';
@@ -140,7 +141,8 @@ export function FilterPanel({
   : 0;
 
   return (
-    <div className="bg-kumo-elevated border border-kumo-line rounded p-3">
+    <div className="relative bg-kumo-elevated border border-kumo-line rounded-xl p-3">
+      <CornerBrackets />
       {/* Main search bar with stats */}
       <div className={`flex gap-2 md:gap-3 ${isMobile ? 'flex-col' : 'items-center'}`}>
         <div className={`flex gap-2 ${isMobile ? 'w-full' : 'flex-1'}`}>
@@ -168,7 +170,7 @@ export function FilterPanel({
             <FunnelIcon size={16} />
             {!isMobile && 'Filters'}
             {hasActiveFilters && (
-              <span className="bg-kumo-brand text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="bg-kumo-brand text-kumo-inverse text-xs rounded-full w-5 h-5 flex items-center justify-center">
                 !
               </span>
             )}
@@ -334,7 +336,7 @@ export function FilterPanel({
                         return (
                           <span
                             key={v}
-                            className="text-xs font-medium px-1 py-0.5 rounded"
+                            className="text-xs font-medium px-1 py-0.5 rounded-full"
                             style={{
                               backgroundColor: info.bgColor,
                               color: info.color,
@@ -351,7 +353,7 @@ export function FilterPanel({
                 {Object.entries(SEVERITY_LEVELS).map(([level, info]) => (
                   <Select.Option key={level} value={level}>
                     <span
-                      className="text-xs font-medium px-1.5 py-0.5 rounded"
+                      className="text-xs font-medium px-1.5 py-0.5 rounded-full"
                       style={{
                         backgroundColor: info.bgColor,
                         color: info.color,

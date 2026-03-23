@@ -248,7 +248,7 @@ export function Settings({
         {/* Header */}
         <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
           <div>
-            <Dialog.Title className="text-xl font-semibold text-kumo-default">
+            <Dialog.Title className="text-xl font-medium text-kumo-default">
               Settings
             </Dialog.Title>
             {backendConfig?.configFile && (
@@ -272,7 +272,7 @@ export function Settings({
 
         {/* Error banner */}
         {error && (
-          <div className="mx-6 mb-2 px-3 py-2 bg-kumo-danger-tint border border-kumo-danger rounded text-sm text-kumo-danger">
+          <div className="mx-6 mb-2 px-3 py-2 bg-kumo-danger-tint border border-kumo-danger rounded-lg text-sm text-kumo-danger">
             {error}
           </div>
         )}
@@ -504,7 +504,7 @@ export function Settings({
                           <button
                             type="button"
                             onClick={() => setShowToken(!showToken)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-kumo-subtle hover:text-kumo-default"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-kumo-subtle hover:text-kumo-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cf-orange)]"
                             aria-label={showToken ? 'Hide token' : 'Show token'}
                           >
                             {showToken ? <EyeSlashIcon size={16} /> : <EyeIcon size={16} />}
@@ -587,7 +587,7 @@ export function Settings({
                         {exclusionPatterns.map((pattern, index) => (
                           <li
                             key={index}
-                            className="flex items-center justify-between gap-2 px-3 py-2 bg-kumo-tint rounded border border-kumo-line"
+                            className="flex items-center justify-between gap-2 px-3 py-2 bg-kumo-tint rounded-lg border border-kumo-line"
                           >
                             <code className="text-sm font-mono text-kumo-default truncate flex-1">
                               {pattern}

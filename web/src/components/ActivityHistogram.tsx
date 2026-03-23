@@ -219,7 +219,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
                 <Popover.Portal>
                   <Popover.Positioner side="bottom" align="center" collisionPadding={8} sideOffset={8}>
                     <Popover.Popup className="min-w-[160px] flex flex-col rounded-lg bg-kumo-elevated px-4 py-3 text-sm shadow-lg border border-kumo-line">
-                      <Popover.Title className="text-sm font-semibold text-kumo-default">
+                      <Popover.Title className="text-sm font-medium text-kumo-default">
                         {intervalStart} - {bar.hour}
                       </Popover.Title>
                       <Popover.Description className="text-sm text-kumo-strong">

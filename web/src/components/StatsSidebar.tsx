@@ -25,7 +25,7 @@ function StatItem({ label, count, maxCount, onFilter, color }: StatItemProps) {
   
   return (
     <div 
-      className="group flex items-center gap-2 py-1.5 px-2 rounded hover:bg-kumo-fill cursor-pointer transition-colors"
+      className="group flex items-center gap-2 py-1.5 px-2 rounded-lg border border-transparent hover:border-dashed hover:border-kumo-line hover:bg-kumo-tint cursor-pointer transition-colors"
       onClick={onFilter}
       role="button"
       tabIndex={0}
@@ -77,7 +77,7 @@ interface StatSectionProps {
 function StatSection({ title, children }: StatSectionProps) {
   return (
     <div className="mb-4">
-      <h3 className="text-xs font-semibold text-kumo-subtle uppercase tracking-wider mb-2 px-2">
+      <h3 className="text-xs font-medium text-kumo-subtle uppercase tracking-wider mb-2 px-2">
         {title}
       </h3>
       <div className="space-y-0.5">
@@ -133,7 +133,7 @@ export function StatsSidebar({ topStats, loading, open, onClose, onFilterBy }: S
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line">
-        <h2 className="text-sm font-semibold text-kumo-default">Stats</h2>
+        <h2 className="text-sm font-medium text-kumo-default">Stats</h2>
         <Button
           variant="ghost"
           shape="square"
@@ -158,9 +158,9 @@ export function StatsSidebar({ topStats, loading, open, onClose, onFilterBy }: S
         ) : (
           <>
             {/* Total count */}
-            <div className="px-2 py-2 mb-3 bg-kumo-fill rounded">
+            <div className="px-2 py-2 mb-3 bg-kumo-fill rounded-lg">
               <div className="text-xs text-kumo-subtle">Total Matching</div>
-              <div className="text-lg font-semibold text-kumo-default">
+              <div className="text-lg font-medium text-kumo-default">
                 {topStats.total.toLocaleString()}
               </div>
             </div>

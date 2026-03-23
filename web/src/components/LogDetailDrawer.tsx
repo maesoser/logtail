@@ -650,7 +650,7 @@ export function LogDetailDrawer({
     <Drawer.Root open={open} onOpenChange={onOpenChange} modal>
       <Drawer.Portal>
         <Drawer.Backdrop 
-          className="fixed inset-0 z-50 bg-black/50 transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" 
+          className="fixed inset-0 z-50 bg-kumo-contrast/50 transition-opacity duration-200 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" 
         />
         <Drawer.Popup
           className="fixed top-0 right-0 z-50 h-full w-full max-w-xl bg-kumo-base shadow-xl flex flex-col transition-transform duration-200 data-[ending-style]:translate-x-full data-[starting-style]:translate-x-full"
@@ -659,7 +659,7 @@ export function LogDetailDrawer({
           <div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line">
             <div className="flex items-center gap-3">
               <span
-                className="inline-flex items-center px-2 py-1 rounded text-sm font-semibold uppercase"
+                className="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium uppercase"
                 style={{
                   backgroundColor: severity.bgColor,
                   color: severity.color,
@@ -772,22 +772,22 @@ export function LogDetailDrawer({
                     Content
                   </span>
                   {isJson && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-kumo-info-tint text-kumo-link">
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-kumo-info-tint text-kumo-link">
                       JSON
                     </span>
                   )}
                   {isKeyValue && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-kumo-info-tint text-kumo-link">
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-kumo-info-tint text-kumo-link">
                       Key-Value
                     </span>
                   )}
                   {isStack && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-kumo-danger-tint text-kumo-danger">
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-kumo-danger-tint text-kumo-danger">
                       Stack Trace
                     </span>
                   )}
                   {!isJson && !isKeyValue && !isStack && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-kumo-fill text-kumo-subtle">
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-kumo-fill text-kumo-subtle">
                       Plain Text
                     </span>
                   )}
@@ -902,7 +902,7 @@ export function LogDetailDrawer({
               </Button>
             </div>
             <div className="mt-2 text-xs text-kumo-inactive">
-              Keyboard: <kbd className="px-1 py-0.5 bg-kumo-fill rounded">j</kbd>/<kbd className="px-1 py-0.5 bg-kumo-fill rounded">k</kbd> navigate, <kbd className="px-1 py-0.5 bg-kumo-fill rounded">c</kbd> copy, <kbd className="px-1 py-0.5 bg-kumo-fill rounded">Esc</kbd> close
+              Keyboard: <kbd className="px-1 py-0.5 bg-kumo-fill rounded-md">j</kbd>/<kbd className="px-1 py-0.5 bg-kumo-fill rounded-md">k</kbd> navigate, <kbd className="px-1 py-0.5 bg-kumo-fill rounded-md">c</kbd> copy, <kbd className="px-1 py-0.5 bg-kumo-fill rounded-md">Esc</kbd> close
             </div>
           </div>
         </Drawer.Popup>
@@ -954,7 +954,7 @@ function HighlightSearch({ text, searchTerm }: { text: string; searchTerm?: stri
     <>
       {parts.map((part, i) => 
         part.toLowerCase() === searchTerm.toLowerCase() ? (
-          <mark key={i} className="bg-kumo-warning-tint text-kumo-warning rounded px-0.5">
+          <mark key={i} className="bg-kumo-warning-tint text-kumo-warning rounded-sm px-0.5">
             {part}
           </mark>
         ) : (

@@ -17,6 +17,7 @@ import { useUrlState } from './hooks/useUrlState';
 import { useTimeRangeUrlState } from './hooks/useTimeRangeUrlState';
 import { ActivityHistogram, ActivityHistogramCompact } from './components/ActivityHistogram';
 import { FilterPanel } from './components/FilterPanel';
+import { CornerBrackets } from './components/CornerBrackets';
 import { LogTable } from './components/LogTable';
 import { LogDetailDrawer } from './components/LogDetailDrawer';
 import { StatsSidebar } from './components/StatsSidebar';
@@ -160,7 +161,7 @@ function App() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 md:gap-3">
               <LightningIcon size={isMobile ? 24 : 28} weight="fill" className="text-kumo-brand" />
-              <h1 className="text-lg md:text-xl font-semibold text-kumo-default">
+              <h1 className="text-lg md:text-xl font-medium text-kumo-default">
                 Logtail
               </h1>
             </div>
@@ -218,8 +219,9 @@ function App() {
           {/* Activity Histogram */}
           {stats && stats.histogram.length > 0 && (
             isMobile ? (
-              <div className="bg-kumo-base border border-kumo-line rounded p-3">
-                <h3 className="text-sm font-semibold mb-2 text-kumo-default">Recent Activity</h3>
+              <div className="relative bg-kumo-base border border-kumo-line rounded-xl p-3">
+                <CornerBrackets />
+                <h3 className="text-sm font-medium mb-2 text-kumo-default">Recent Activity</h3>
                 <ActivityHistogramCompact data={stats.histogram} />
               </div>
             ) : (

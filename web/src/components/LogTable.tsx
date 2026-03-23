@@ -193,7 +193,7 @@ export function LogTable({
         const badgeStyle = getSeverityBadgeStyle(value as number);
         return (
           <span 
-            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs uppercase font-medium"
+            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs uppercase font-medium"
             style={badgeStyle}
           >
             {severity.name}
@@ -257,7 +257,7 @@ export function LogTable({
     <div className="space-y-3">
       <div 
         ref={tableRef}
-        className={`bg-kumo-elevated border border-kumo-line rounded overflow-hidden ${resizing ? 'select-none' : ''}`}
+        className={`bg-kumo-elevated border border-kumo-line rounded-xl overflow-hidden ${resizing ? 'select-none' : ''}`}
       >
         <div className="overflow-x-auto">
           <Table layout="fixed">
@@ -280,7 +280,7 @@ export function LogTable({
                     <Table.Head
                       key={col.key}
                       className={`
-                        text-xs font-semibold text-kumo-subtle uppercase tracking-wider 
+                        text-xs font-medium text-kumo-subtle uppercase tracking-wider 
                         py-1 px-1.5 bg-kumo-tint relative group
                         ${!isContentCol ? 'cursor-grab' : ''}
                         ${isDragging ? 'opacity-50' : ''}
@@ -379,7 +379,7 @@ export function LogRow({ entry, columns }: { entry: LogEntry; columns: ColumnCon
   return (
     <div className="flex items-center gap-2 py-1 px-2 border-b border-kumo-line hover:bg-kumo-tint animate-fade-in">
       <span
-        className="inline-flex items-center px-1.5 py-0.5 rounded text-xs uppercase font-medium shrink-0"
+        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs uppercase font-medium shrink-0"
         style={badgeStyle}
       >
         {severity.name}
