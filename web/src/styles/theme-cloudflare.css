@@ -1,0 +1,228 @@
+/**
+ * Cloudflare brand theme for Kumo UI
+ *
+ * Apply with: <html data-theme="cloudflare">
+ * Combines with data-mode="light" / data-mode="dark" for full light/dark support.
+ *
+ * Token source: Cloudflare Design System 2.x brand palette
+ */
+
+/* ─── Kumo semantic token overrides ──────────────────────────────────────── */
+
+@layer base {
+  [data-theme="cloudflare"] {
+
+    /* Surface hierarchy */
+    --color-kumo-base: light-dark(
+      #FFFBF5,   /* cf-bg-100 — primary surface */
+      #121212    /* cf-bg-100 dark */
+    );
+
+    --color-kumo-elevated: light-dark(
+      #FFFDFB,   /* cf-bg-200 — raised cards */
+      #191817    /* cf-bg-200 dark */
+    );
+
+    --color-kumo-recessed: light-dark(
+      #F5F1EB,   /* cf-bg-page — outer page background */
+      #0D0D0D
+    );
+
+    --color-kumo-overlay: light-dark(
+      #FEF7ED,   /* cf-bg-300 — popovers, dropdowns */
+      #2A2927    /* cf-bg-300 dark */
+    );
+
+    --color-kumo-control: light-dark(
+      #FFFBF5,   /* input / button background */
+      #191817
+    );
+
+    --color-kumo-tint: light-dark(
+      #FEF7ED,   /* cf-bg-300 */
+      #2A2927
+    );
+
+    --color-kumo-fill: light-dark(
+      #EBD5C1,   /* cf-border */
+      rgba(240, 227, 222, 0.13)
+    );
+
+    --color-kumo-fill-hover: light-dark(
+      #FEF7ED,   /* cf-bg-300 */
+      #2A2927
+    );
+
+    --color-kumo-interact: light-dark(
+      #EBD5C1,   /* cf-border */
+      rgba(240, 227, 222, 0.25)
+    );
+
+    --color-kumo-contrast: light-dark(
+      #521000,   /* cf-text */
+      #F0E3DE    /* cf-text dark */
+    );
+
+    /* Lines & rings */
+    --color-kumo-line: light-dark(
+      rgba(235, 213, 193, 0.5),   /* cf-border-light */
+      rgba(240, 227, 222, 0.13)   /* cf-border dark */
+    );
+
+    --color-kumo-ring: light-dark(
+      #EBD5C1,
+      rgba(240, 227, 222, 0.30)
+    );
+
+    /* Brand — CF orange */
+    --color-kumo-brand: light-dark(
+      #FF4801,   /* cf-orange */
+      #F14602
+    );
+
+    --color-kumo-brand-hover: light-dark(
+      #FF7038,   /* cf-orange-hover */
+      #FF6D33
+    );
+
+    /* Semantic: danger / warning / info */
+    --color-kumo-danger: light-dark(
+      #DC2626,
+      #F87171
+    );
+
+    --color-kumo-danger-tint: light-dark(
+      rgba(220, 38, 38, 0.10),
+      rgba(248, 113, 113, 0.15)
+    );
+
+    --color-kumo-warning: light-dark(
+      #EAB308,
+      #FACC15
+    );
+
+    --color-kumo-warning-tint: light-dark(
+      rgba(234, 179, 8, 0.15),
+      rgba(250, 204, 21, 0.15)
+    );
+
+    --color-kumo-info: light-dark(
+      #2563EB,
+      #60A5FA
+    );
+
+    --color-kumo-info-tint: light-dark(
+      rgba(37, 99, 235, 0.10),
+      rgba(96, 165, 250, 0.15)
+    );
+
+    /* Text tokens */
+    --text-color-kumo-default: light-dark(
+      #521000,                    /* cf-text */
+      #F0E3DE                     /* cf-text dark */
+    );
+
+    --text-color-kumo-inverse: light-dark(
+      #FFFBF5,
+      #521000
+    );
+
+    --text-color-kumo-strong: light-dark(
+      rgba(82, 16, 0, 0.80),
+      rgba(240, 227, 222, 0.85)
+    );
+
+    --text-color-kumo-subtle: light-dark(
+      rgba(82, 16, 0, 0.60),      /* cf-text-muted */
+      rgba(255, 253, 251, 0.56)   /* cf-text-muted dark */
+    );
+
+    --text-color-kumo-inactive: light-dark(
+      rgba(82, 16, 0, 0.38),      /* cf-text-subtle */
+      rgba(255, 253, 251, 0.35)
+    );
+
+    --text-color-kumo-brand: light-dark(
+      #FF4801,
+      #F14602
+    );
+
+    --text-color-kumo-link: light-dark(
+      #FF4801,
+      #FF7038
+    );
+
+    --text-color-kumo-danger: light-dark(
+      #DC2626,
+      #F87171
+    );
+
+    --text-color-kumo-warning: light-dark(
+      #EAB308,
+      #FACC15
+    );
+
+    --text-color-kumo-success: light-dark(
+      #16A34A,
+      #4ADE80
+    );
+  }
+}
+
+/* ─── CF-specific tokens (product categories, providers, orange tints) ──── */
+/* These are not part of the Kumo token system. Reference them directly      */
+/* with arbitrary Tailwind values: bg-[var(--cf-orange)] etc.                */
+
+:root {
+  /* Primary palette */
+  --cf-orange:             #FF4801;
+  --cf-orange-hover:       #FF7038;
+  --cf-orange-light:       rgba(255, 72, 1, 0.10);
+  --cf-text:               #521000;
+  --cf-text-muted:         rgba(82, 16, 0, 0.60);
+  --cf-text-subtle:        rgba(82, 16, 0, 0.38);
+  --cf-bg-page:            #F5F1EB;
+  --cf-bg-100:             #FFFBF5;
+  --cf-bg-200:             #FFFDFB;
+  --cf-bg-300:             #FEF7ED;
+  --cf-border:             #EBD5C1;
+  --cf-border-light:       rgba(235, 213, 193, 0.50);
+
+  /* Product category colors */
+  --cf-compute:            #0A95FF;
+  --cf-compute-bg:         rgba(10, 149, 255, 0.10);
+  --cf-storage:            #EE0DDB;
+  --cf-storage-bg:         rgba(238, 13, 219, 0.10);
+  --cf-ai:                 #19E306;
+  --cf-ai-bg:              #F2F5E1;
+  --cf-media:              #9616FF;
+  --cf-media-bg:           #F8EBEE;
+
+  /* Provider comparison colors */
+  --cf-provider-cf:        #FF4801;
+  --cf-provider-aws:       #FF9900;
+  --cf-provider-gcp:       #4285F4;
+  --cf-provider-azure:     #0078D4;
+}
+
+:root[data-mode="dark"] {
+  /* Primary palette — dark overrides */
+  --cf-orange:             #F14602;
+  --cf-orange-hover:       #FF6D33;
+  --cf-orange-light:       rgba(241, 70, 2, 0.15);
+  --cf-text:               #F0E3DE;
+  --cf-text-muted:         rgba(255, 253, 251, 0.56);
+  --cf-text-subtle:        rgba(255, 253, 251, 0.35);
+  --cf-bg-page:            #0D0D0D;
+  --cf-bg-100:             #121212;
+  --cf-bg-200:             #191817;
+  --cf-bg-300:             #2A2927;
+  --cf-border:             rgba(240, 227, 222, 0.13);
+  --cf-border-light:       rgba(240, 227, 222, 0.08);
+
+  /* Product category bg tints — slightly stronger in dark */
+  --cf-compute-bg:         rgba(10, 149, 255, 0.15);
+  --cf-storage-bg:         rgba(238, 13, 219, 0.15);
+  --cf-ai-bg:              rgba(25, 227, 6, 0.12);
+  --cf-media-bg:           rgba(150, 22, 255, 0.15);
+}

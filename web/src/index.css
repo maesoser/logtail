@@ -7,6 +7,9 @@
 /* Import Tailwind */
 @import "tailwindcss";
 
+/* Cloudflare brand theme */
+@import "./styles/theme-cloudflare.css";
+
 /* Syntax highlighting color tokens — mode-aware via Kumo data-mode */
 :root {
   /* light mode defaults */
