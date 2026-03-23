@@ -252,7 +252,9 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
         {/* Time labels */}
         <div className="flex justify-between px-1 text-xs text-kumo-subtle mt-1">
           <span>{data[0]?.hour || ''}</span>
-          <span>{data[Math.floor(data.length / 2)]?.hour || ''}</span>
+          <span>{data[Math.floor(1 * data.length / 4)]?.hour || ''}</span>
+          <span>{data[Math.floor(2 * data.length / 4)]?.hour || ''}</span>
+          <span>{data[Math.floor(3 * data.length / 4)]?.hour || ''}</span>
           <span>{data[data.length - 1]?.hour || ''}</span>
         </div>
       

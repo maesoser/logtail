@@ -15,9 +15,8 @@ import { usePersistedColumns } from './hooks/usePersistedColumns';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useUrlState } from './hooks/useUrlState';
 import { useTimeRangeUrlState } from './hooks/useTimeRangeUrlState';
-import { ActivityHistogram, ActivityHistogramCompact } from './components/ActivityHistogram';
+import { ActivityHistogram } from './components/ActivityHistogram';
 import { FilterPanel } from './components/FilterPanel';
-import { CornerBrackets } from './components/CornerBrackets';
 import { LogTable } from './components/LogTable';
 import { LogDetailDrawer } from './components/LogDetailDrawer';
 import { StatsSidebar } from './components/StatsSidebar';
@@ -179,17 +178,15 @@ function App() {
                 {!isMobile && 'Refresh'}
               </Button>
               
-              {/* Stats sidebar toggle - hide on mobile */}
-              {!isMobile && (
-                <Button
-                  variant={statsSidebarOpen ? 'primary' : 'outline'}
-                  onClick={() => setStatsSidebarOpen(!statsSidebarOpen)}
-                  shape="square"
-                  aria-label={statsSidebarOpen ? 'Close stats sidebar' : 'Open stats sidebar'}
-                >
-                  <ChartBarIcon size={16} />
-                </Button>
-              )}
+              {/* Stats sidebar toggle */}
+              <Button
+                variant={statsSidebarOpen ? 'primary' : 'outline'}
+                onClick={() => setStatsSidebarOpen(!statsSidebarOpen)}
+                shape="square"
+                aria-label={statsSidebarOpen ? 'Close stats sidebar' : 'Open stats sidebar'}
+              >
+                <ChartBarIcon size={16} />
+              </Button>
               
               {/* Settings - hide on mobile */}
               {!isMobile && (
@@ -218,13 +215,6 @@ function App() {
         <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {/* Activity Histogram */}
           {stats && stats.histogram.length > 0 && (
-            isMobile ? (
-              <div className="relative bg-kumo-base border border-kumo-line rounded-xl p-3">
-                <CornerBrackets />
-                <h3 className="text-sm font-medium mb-2 text-kumo-default">Recent Activity</h3>
-                <ActivityHistogramCompact data={stats.histogram} />
-              </div>
-            ) : (
               <ActivityHistogram 
                 data={stats.histogram}
                 bucketMinutes={stats.bucketMinutes}
@@ -232,7 +222,6 @@ function App() {
                 onTimeRangeChange={setTimeRange}
                 onBucketClick={handleHistogramBucketClick}
               />
-            )
           )}
 
           {/* Filter Panel */}
@@ -266,8 +255,16 @@ function App() {
           />
         </main>
         
-        {/* Stats Sidebar */}
-        {!isMobile && (
+        {/* Stats Sidebar — desktop: inline panel; mobile: bottom sheet overlay */}
+        {isMobile ? (
+          <StatsSidebar
+            topStats={topStats}
+            loading={topStatsLoading}
+            open={statsSidebarOpen}
+            onClose={() => setStatsSidebarOpen(false)}
+            onFilterBy={handleQuickFilter}
+          />
+        ) : (
           <div className={`overflow-hidden transition-all duration-200 ${statsSidebarOpen ? 'w-72' : 'w-0'}`}>
             <StatsSidebar
               topStats={topStats}

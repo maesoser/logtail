@@ -3,6 +3,7 @@ import { Button } from '@cloudflare/kumo';
 import { XIcon, MagnifyingGlassIcon } from '@phosphor-icons/react';
 import type { TopStats, LogFilter } from '../types';
 import { SEVERITY_LEVELS } from '../types';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 interface StatsSidebarProps {
   topStats: TopStats | null;
@@ -88,9 +89,11 @@ function StatSection({ title, children }: StatSectionProps) {
 }
 
 export function StatsSidebar({ topStats, loading, open, onClose, onFilterBy }: StatsSidebarProps) {
+  const isMobile = useIsMobile();
+
   // Track mount state for animation
   const [isVisible, setIsVisible] = useState(false);
-  
+
   useEffect(() => {
     if (open) {
       // Small delay to trigger CSS transition after mount
@@ -100,6 +103,16 @@ export function StatsSidebar({ topStats, loading, open, onClose, onFilterBy }: S
       setIsVisible(false);
     }
   }, [open]);
+
+  // Lock body scroll when open on mobile
+  useEffect(() => {
+    if (isMobile && open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobile, open]);
 
   const handleHostnameFilter = useCallback((hostname: string) => {
     onFilterBy({ hostname: [hostname] });
@@ -123,16 +136,10 @@ export function StatsSidebar({ topStats, loading, open, onClose, onFilterBy }: S
   const maxClientCount = topStats?.clients?.[0]?.count || 1;
   const maxSeverityCount = topStats?.severities?.[0]?.count || 1;
 
-  return (
-    <aside 
-      className={`
-        w-72 border-l border-kumo-line bg-kumo-base flex flex-col h-full
-        transition-transform duration-200 ease-out
-        ${isVisible ? 'translate-x-0' : 'translate-x-full'}
-      `}
-    >
+  const content = (
+    <>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line shrink-0">
         <h2 className="text-sm font-medium text-kumo-default">Stats</h2>
         <Button
           variant="ghost"
@@ -231,6 +238,55 @@ export function StatsSidebar({ topStats, loading, open, onClose, onFilterBy }: S
           </>
         )}
       </div>
+    </>
+  );
+
+  // ── Mobile: full-screen bottom sheet ────────────────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 ${
+            isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+          onClick={onClose}
+          aria-hidden="true"
+        />
+
+        {/* Sheet */}
+        <div
+          className={`
+            fixed inset-x-0 bottom-0 z-50 flex flex-col
+            bg-kumo-base border-t border-kumo-line
+            rounded-t-xl
+            transition-transform duration-200 ease-out
+            ${isVisible ? 'translate-y-0' : 'translate-y-full'}
+          `}
+          style={{ maxHeight: '80dvh' }}
+          role="dialog"
+          aria-label="Stats"
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1 shrink-0">
+            <div className="w-10 h-1 rounded-full bg-kumo-line" />
+          </div>
+          {content}
+        </div>
+      </>
+    );
+  }
+
+  // ── Desktop: inline sidebar panel ───────────────────────────────────────
+  return (
+    <aside
+      className={`
+        w-72 border-l border-kumo-line bg-kumo-base flex flex-col h-full
+        transition-transform duration-200 ease-out
+        ${isVisible ? 'translate-x-0' : 'translate-x-full'}
+      `}
+    >
+      {content}
     </aside>
   );
 }

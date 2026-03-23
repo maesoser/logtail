@@ -192,13 +192,15 @@ export function FilterPanel({
 
         {/* Stats section - right aligned on desktop, full width on mobile */}
         <div className={`flex items-center gap-3 md:gap-4 text-xs ${isMobile ? 'justify-between' : 'ml-auto'}`}>
-          <div className="flex items-center gap-1.5">
-            <DatabaseIcon size={14} className="text-kumo-subtle" />
-            <Text variant="secondary">
-              {stats?.totalEntries?.toLocaleString() ?? 0}{!isMobile && ` / ${usagePercentage}%`}
-            </Text>
-          </div>
-          
+          {!isMobile && (
+            <div className="flex items-center gap-1.5">
+              <DatabaseIcon size={14} className="text-kumo-subtle" />
+              <Text variant="secondary">
+                {stats?.totalEntries?.toLocaleString() ?? 0}{` / ${usagePercentage}%`}
+              </Text>
+            </div>
+          )}
+
           {stats?.oldestTimestamp && !isMobile && (
             <div className="flex items-center gap-1.5">
               <ClockIcon size={14} className="text-kumo-subtle" />
@@ -208,6 +210,7 @@ export function FilterPanel({
             </div>
           )}
           
+          {!isMobile && (
           <div className="flex items-center gap-1.5">
             {connected ? (
               <WifiHighIcon size={14} className="text-kumo-success" />
@@ -223,6 +226,7 @@ export function FilterPanel({
               </Text>
             )}
           </div>
+          )}
         </div>
       </div>
 
