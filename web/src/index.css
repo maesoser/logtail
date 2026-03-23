@@ -18,6 +18,26 @@
   --color-syntax-timestamp: #0891b2;
   --color-syntax-url:       #0d9488;
   --color-syntax-ip:        #0284c7;
+
+  /* Severity color tokens (foreground + background tint) */
+  --color-severity-emergency:    #991B1B;
+  --color-severity-emergency-bg: rgb(153 27 27 / 0.1);
+  --color-severity-alert:        #B91C1C;
+  --color-severity-alert-bg:     rgb(185 28 28 / 0.1);
+  --color-severity-critical:     #DC2626;
+  --color-severity-critical-bg:  rgb(220 38 38 / 0.1);
+  --color-severity-error:        #E5484D;
+  --color-severity-error-bg:     rgb(229 72 77 / 0.1);
+  --color-severity-warning:      #D97706;
+  --color-severity-warning-bg:   rgb(217 119 6 / 0.1);
+  --color-severity-notice:       #2563EB;
+  --color-severity-notice-bg:    rgb(37 99 235 / 0.1);
+  --color-severity-info:         #059669;
+  --color-severity-info-bg:      rgb(5 150 105 / 0.1);
+  --color-severity-debug:        #6B7280;
+  --color-severity-debug-bg:     rgb(107 114 128 / 0.1);
+  --color-severity-unknown:      #6B7280;
+  --color-severity-unknown-bg:   rgb(107 114 128 / 0.1);
 }
 
 :root[data-mode="dark"] {
@@ -29,6 +49,26 @@
   --color-syntax-timestamp: #22d3ee;
   --color-syntax-url:       #2dd4bf;
   --color-syntax-ip:        #38bdf8;
+
+  /* Severity color tokens — lightened for dark backgrounds */
+  --color-severity-emergency:    #FCA5A5;
+  --color-severity-emergency-bg: rgb(252 165 165 / 0.15);
+  --color-severity-alert:        #F87171;
+  --color-severity-alert-bg:     rgb(248 113 113 / 0.15);
+  --color-severity-critical:     #F87171;
+  --color-severity-critical-bg:  rgb(248 113 113 / 0.15);
+  --color-severity-error:        #F87171;
+  --color-severity-error-bg:     rgb(248 113 113 / 0.15);
+  --color-severity-warning:      #FCD34D;
+  --color-severity-warning-bg:   rgb(252 211 77 / 0.15);
+  --color-severity-notice:       #60A5FA;
+  --color-severity-notice-bg:    rgb(96 165 250 / 0.15);
+  --color-severity-info:         #34D399;
+  --color-severity-info-bg:      rgb(52 211 153 / 0.15);
+  --color-severity-debug:        #9CA3AF;
+  --color-severity-debug-bg:     rgb(156 163 175 / 0.15);
+  --color-severity-unknown:      #9CA3AF;
+  --color-severity-unknown-bg:   rgb(156 163 175 / 0.15);
 }
 
 /* Base styles */

@@ -166,7 +166,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
                   segments.push({
                     severity,
                     height: segmentHeight,
-                    color: SEVERITY_LEVELS[level]?.color || '#6B7280',
+                    color: SEVERITY_LEVELS[level]?.color || 'var(--color-severity-debug)',
                     count,
                   });
                 }
@@ -176,7 +176,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
               segments.push({
                 severity: 'info',
                 height: totalBarHeight,
-                color: '#0066FF',
+                color: 'var(--color-severity-notice)',
                 count: bar.count,
               });
             }
@@ -186,7 +186,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
               ? SEVERITY_ORDER.filter(s => bar.bySeverity[s] > 0).map(s => ({
                   name: s,
                   count: bar.bySeverity[s],
-                  color: SEVERITY_LEVELS[SEVERITY_NAME_TO_LEVEL[s]]?.color || '#6B7280',
+                  color: SEVERITY_LEVELS[SEVERITY_NAME_TO_LEVEL[s]]?.color || 'var(--color-severity-debug)',
                 }))
               : [];
 

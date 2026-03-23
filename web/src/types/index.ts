@@ -172,21 +172,21 @@ export function getFacilityName(facility: number): string {
   return FACILITY_NAMES[facility] ?? String(facility);
 }
 
-// Severity level names and colors
+// Severity level names and colors (via CSS custom properties — adapts to light/dark mode)
 export const SEVERITY_LEVELS: Record<number, { name: string; color: string; bgColor: string }> = {
-  0: { name: 'emergency', color: '#991B1B', bgColor: '#991B1B1A' },
-  1: { name: 'alert', color: '#B91C1C', bgColor: '#B91C1C1A' },
-  2: { name: 'critical', color: '#DC2626', bgColor: '#DC26261A' },
-  3: { name: 'error', color: '#E5484D', bgColor: '#E5484D1A' },
-  4: { name: 'warning', color: '#F59E0B', bgColor: '#F59E0B1A' },
-  5: { name: 'notice', color: '#3B82F6', bgColor: '#3B82F61A' },
-  6: { name: 'info', color: '#28B47C', bgColor: '#28B47C1A' },
-  7: { name: 'debug', color: '#6B7280', bgColor: '#6B72801A' },
+  0: { name: 'emergency', color: 'var(--color-severity-emergency)',    bgColor: 'var(--color-severity-emergency-bg)' },
+  1: { name: 'alert',     color: 'var(--color-severity-alert)',        bgColor: 'var(--color-severity-alert-bg)' },
+  2: { name: 'critical',  color: 'var(--color-severity-critical)',     bgColor: 'var(--color-severity-critical-bg)' },
+  3: { name: 'error',     color: 'var(--color-severity-error)',        bgColor: 'var(--color-severity-error-bg)' },
+  4: { name: 'warning',   color: 'var(--color-severity-warning)',      bgColor: 'var(--color-severity-warning-bg)' },
+  5: { name: 'notice',    color: 'var(--color-severity-notice)',       bgColor: 'var(--color-severity-notice-bg)' },
+  6: { name: 'info',      color: 'var(--color-severity-info)',         bgColor: 'var(--color-severity-info-bg)' },
+  7: { name: 'debug',     color: 'var(--color-severity-debug)',        bgColor: 'var(--color-severity-debug-bg)' },
 };
 
 // Get severity info with fallback
 export function getSeverityInfo(level: number): { name: string; color: string; bgColor: string } {
-  return SEVERITY_LEVELS[level] ?? { name: 'unknown', color: '#FFFFFF', bgColor: '#6B7280' };
+  return SEVERITY_LEVELS[level] ?? { name: 'unknown', color: 'var(--color-severity-unknown)', bgColor: 'var(--color-severity-unknown-bg)' };
 }
 
 // Format timestamp for display
