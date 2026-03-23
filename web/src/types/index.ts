@@ -174,14 +174,14 @@ export function getFacilityName(facility: number): string {
 
 // Severity level names and colors
 export const SEVERITY_LEVELS: Record<number, { name: string; color: string; bgColor: string }> = {
-  0: { name: 'emergency', color: '#FFFFFF', bgColor: '#991B1B' },
-  1: { name: 'alert', color: '#FFFFFF', bgColor: '#B91C1C' },
-  2: { name: 'critical', color: '#FFFFFF', bgColor: '#DC2626' },
-  3: { name: 'error', color: '#FFFFFF', bgColor: '#E5484D' },
-  4: { name: 'warning', color: '#000000', bgColor: '#F59E0B' },
-  5: { name: 'notice', color: '#FFFFFF', bgColor: '#3B82F6' },
-  6: { name: 'info', color: '#FFFFFF', bgColor: '#28B47C' },
-  7: { name: 'debug', color: '#FFFFFF', bgColor: '#6B7280' },
+  0: { name: 'emergency', color: '#991B1B', bgColor: '#991B1B1A' },
+  1: { name: 'alert', color: '#B91C1C', bgColor: '#B91C1C1A' },
+  2: { name: 'critical', color: '#DC2626', bgColor: '#DC26261A' },
+  3: { name: 'error', color: '#E5484D', bgColor: '#E5484D1A' },
+  4: { name: 'warning', color: '#F59E0B', bgColor: '#F59E0B1A' },
+  5: { name: 'notice', color: '#3B82F6', bgColor: '#3B82F61A' },
+  6: { name: 'info', color: '#28B47C', bgColor: '#28B47C1A' },
+  7: { name: 'debug', color: '#6B7280', bgColor: '#6B72801A' },
 };
 
 // Get severity info with fallback

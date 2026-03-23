@@ -12,6 +12,7 @@ logtail
 # Frontend
 web/node_modules/
 web/dist/
+web/tsconfig.tsbuildinfo
 
 # IDE
 .vscode/
@@ -29,6 +30,7 @@ Thumbs.db
 .env.local
 .env.*.local
 *.dat
+
 
 # Logs
 *.log

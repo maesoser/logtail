@@ -166,7 +166,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
                   segments.push({
                     severity,
                     height: segmentHeight,
-                    color: SEVERITY_LEVELS[level]?.bgColor || '#6B7280',
+                    color: SEVERITY_LEVELS[level]?.color || '#6B7280',
                     count,
                   });
                 }
@@ -186,7 +186,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
               ? SEVERITY_ORDER.filter(s => bar.bySeverity[s] > 0).map(s => ({
                   name: s,
                   count: bar.bySeverity[s],
-                  color: SEVERITY_LEVELS[SEVERITY_NAME_TO_LEVEL[s]]?.bgColor || '#6B7280',
+                  color: SEVERITY_LEVELS[SEVERITY_NAME_TO_LEVEL[s]]?.color || '#6B7280',
                 }))
               : [];
 
@@ -266,7 +266,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
               <div key={severity} className="flex items-center gap-1">
                 <div 
                   className="w-3 h-3 rounded-sm" 
-                  style={{ backgroundColor: info.bgColor }}
+                  style={{ backgroundColor: info.color }}
                 />
                 <span className="text-kumo-subtle capitalize">{severity}</span>
               </div>

@@ -177,7 +177,7 @@ export function StatsSidebar({ topStats, loading, open, onClose, onFilterBy }: S
                       count={item.count}
                       maxCount={maxSeverityCount}
                       onFilter={() => handleSeverityFilter(item.level)}
-                      color={severityInfo?.bgColor}
+                      color={severityInfo?.color}
                     />
                   );
                 })}
