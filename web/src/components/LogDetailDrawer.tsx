@@ -67,17 +67,17 @@ const VALUE_PATTERNS: { type: TokenType; pattern: RegExp }[] = [
 
 // Color classes for each token type
 const TOKEN_COLORS: Record<TokenType, string> = {
-  uuid: 'text-violet-600 dark:text-violet-400',
-  timestamp: 'text-cyan-600 dark:text-cyan-400',
-  url: 'text-teal-600 dark:text-teal-400',
-  ip: 'text-sky-600 dark:text-sky-400',
-  text: 'text-green-600 dark:text-green-400', // Default string color
+  uuid: 'text-[var(--color-syntax-uuid)]',
+  timestamp: 'text-[var(--color-syntax-timestamp)]',
+  url: 'text-[var(--color-syntax-url)]',
+  ip: 'text-[var(--color-syntax-ip)]',
+  text: 'text-[var(--color-syntax-string)]', // Default string color
   bracket: 'text-kumo-subtle',
-  'level-error': 'text-red-600 dark:text-red-400',
-  'level-warn': 'text-amber-600 dark:text-amber-400',
-  'level-info': 'text-blue-600 dark:text-blue-400',
-  'level-debug': 'text-gray-500 dark:text-gray-400',
-  component: 'text-violet-600 dark:text-violet-400',
+  'level-error': 'text-kumo-danger',
+  'level-warn': 'text-kumo-warning',
+  'level-info': 'text-kumo-link',
+  'level-debug': 'text-kumo-inactive',
+  component: 'text-[var(--color-syntax-uuid)]',
 };
 
 // Tokenize a value string, finding all special patterns
@@ -202,9 +202,9 @@ function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.React
     if (value === 'true' || value === 'false') {
       return (
         <>
-          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-[var(--color-syntax-key)]">{key}</span>
           <span className="text-kumo-subtle">=</span>
-          <span className="text-purple-600 dark:text-purple-400">{value}</span>
+          <span className="text-[var(--color-syntax-boolean)]">{value}</span>
         </>
       );
     }
@@ -212,9 +212,9 @@ function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.React
     if (value === 'null' || value === 'nil') {
       return (
         <>
-          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-[var(--color-syntax-key)]">{key}</span>
           <span className="text-kumo-subtle">=</span>
-          <span className="text-gray-500">{value}</span>
+          <span className="text-kumo-inactive">{value}</span>
         </>
       );
     }
@@ -222,9 +222,9 @@ function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.React
     if (/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)) {
       return (
         <>
-          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-[var(--color-syntax-key)]">{key}</span>
           <span className="text-kumo-subtle">=</span>
-          <span className="text-orange-600 dark:text-orange-400">{value}</span>
+          <span className="text-[var(--color-syntax-number)]">{value}</span>
         </>
       );
     }
@@ -232,36 +232,36 @@ function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.React
     if (/^(error|err|fatal|critical|crit)$/i.test(value)) {
       return (
         <>
-          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-[var(--color-syntax-key)]">{key}</span>
           <span className="text-kumo-subtle">=</span>
-          <span className="text-red-600 dark:text-red-400">{value}</span>
+          <span className="text-kumo-danger">{value}</span>
         </>
       );
     }
     if (/^(warn|warning)$/i.test(value)) {
       return (
         <>
-          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-[var(--color-syntax-key)]">{key}</span>
           <span className="text-kumo-subtle">=</span>
-          <span className="text-amber-600 dark:text-amber-400">{value}</span>
+          <span className="text-kumo-warning">{value}</span>
         </>
       );
     }
     if (/^(info|notice)$/i.test(value)) {
       return (
         <>
-          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-[var(--color-syntax-key)]">{key}</span>
           <span className="text-kumo-subtle">=</span>
-          <span className="text-blue-600 dark:text-blue-400">{value}</span>
+          <span className="text-kumo-link">{value}</span>
         </>
       );
     }
     if (/^(debug|trace)$/i.test(value)) {
       return (
         <>
-          <span className="text-blue-600 dark:text-blue-400">{key}</span>
+          <span className="text-[var(--color-syntax-key)]">{key}</span>
           <span className="text-kumo-subtle">=</span>
-          <span className="text-gray-500 dark:text-gray-400">{value}</span>
+          <span className="text-kumo-inactive">{value}</span>
         </>
       );
     }
@@ -283,9 +283,9 @@ function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.React
     
     return (
       <>
-        <span className="text-blue-600 dark:text-blue-400">{key}</span>
+        <span className="text-[var(--color-syntax-key)]">{key}</span>
         <span className="text-kumo-subtle">=</span>
-        {renderTokenizedValue(displayTokens, searchTerm, 'text-green-600 dark:text-green-400')}
+        {renderTokenizedValue(displayTokens, searchTerm, 'text-[var(--color-syntax-string)]')}
       </>
     );
   }
@@ -300,9 +300,9 @@ function highlightKeyValue(pair: KeyValuePair, searchTerm?: string): React.React
   
   return (
     <>
-      <span className="text-blue-600 dark:text-blue-400">{key}</span>
+      <span className="text-[var(--color-syntax-key)]">{key}</span>
       <span className="text-kumo-subtle">=</span>
-      <span className="text-green-600 dark:text-green-400">{highlightedValue}</span>
+      <span className="text-[var(--color-syntax-string)]">{highlightedValue}</span>
     </>
   );
 }
@@ -510,28 +510,28 @@ function highlightJson(json: string): React.ReactNode {
     if (keyMatch) {
       // JSON key
       parts.push(
-        <span key={key++} className="text-blue-600 dark:text-blue-400">{keyMatch}</span>
+        <span key={key++} className="text-[var(--color-syntax-key)]">{keyMatch}</span>
       );
       parts.push(':');
     } else if (stringMatch) {
       // JSON string value
       parts.push(
-        <span key={key++} className="text-green-600 dark:text-green-400">{stringMatch}</span>
+        <span key={key++} className="text-[var(--color-syntax-string)]">{stringMatch}</span>
       );
     } else if (boolMatch) {
       // Boolean
       parts.push(
-        <span key={key++} className="text-purple-600 dark:text-purple-400">{boolMatch}</span>
+        <span key={key++} className="text-[var(--color-syntax-boolean)]">{boolMatch}</span>
       );
     } else if (nullMatch) {
       // Null
       parts.push(
-        <span key={key++} className="text-gray-500 dark:text-gray-500">{nullMatch}</span>
+        <span key={key++} className="text-kumo-inactive">{nullMatch}</span>
       );
     } else if (numberMatch) {
       // Number
       parts.push(
-        <span key={key++} className="text-orange-600 dark:text-orange-400">{numberMatch}</span>
+        <span key={key++} className="text-[var(--color-syntax-number)]">{numberMatch}</span>
       );
     } else {
       parts.push(fullMatch);
@@ -777,7 +777,7 @@ export function LogDetailDrawer({
                     </span>
                   )}
                   {isKeyValue && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-kumo-info-tint text-kumo-link">
                       Key-Value
                     </span>
                   )}
@@ -954,7 +954,7 @@ function HighlightSearch({ text, searchTerm }: { text: string; searchTerm?: stri
     <>
       {parts.map((part, i) => 
         part.toLowerCase() === searchTerm.toLowerCase() ? (
-          <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 text-inherit rounded px-0.5">
+          <mark key={i} className="bg-kumo-warning-tint text-kumo-warning rounded px-0.5">
             {part}
           </mark>
         ) : (

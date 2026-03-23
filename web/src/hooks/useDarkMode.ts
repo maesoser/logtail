@@ -14,16 +14,10 @@ export function useDarkMode() {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  // Apply dark mode using data-mode attribute (for Kumo) and class (for Tailwind)
+  // Apply dark mode using data-mode attribute (Kumo semantic tokens handle theming)
   useEffect(() => {
     const root = document.documentElement;
-    if (isDark) {
-      root.classList.add('dark');
-      root.setAttribute('data-mode', 'dark');
-    } else {
-      root.classList.remove('dark');
-      root.setAttribute('data-mode', 'light');
-    }
+    root.setAttribute('data-mode', isDark ? 'dark' : 'light');
     // Persist to localStorage
     localStorage.setItem(STORAGE_KEY, String(isDark));
   }, [isDark]);

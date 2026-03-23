@@ -41,7 +41,7 @@ export function HighlightedText({ text, highlight, className = '' }: Highlighted
         part.isMatch ? (
           <mark 
             key={index} 
-            className="bg-yellow-200 dark:bg-yellow-700 text-inherit rounded px-0.5"
+            className="bg-kumo-warning-tint text-kumo-warning rounded px-0.5"
           >
             {part.text}
           </mark>

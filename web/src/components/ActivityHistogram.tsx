@@ -335,7 +335,7 @@ export function ActivityHistogramCompact({ data }: { data: HistogramBucket[] }) 
                 ))
               ) : (
                 <div
-                  className="h-full bg-blue-600 rounded"
+                  className="h-full bg-kumo-brand rounded"
                   style={{ width: `${totalWidth}%` }}
                 />
               )}

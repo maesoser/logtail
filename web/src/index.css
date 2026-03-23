@@ -7,27 +7,28 @@
 /* Import Tailwind */
 @import "tailwindcss";
 
-/* Enable class-based dark mode */
-@custom-variant dark (&:where(.dark, .dark *));
+/* Syntax highlighting color tokens — mode-aware via Kumo data-mode */
+:root {
+  /* light mode defaults */
+  --color-syntax-key:       #2563eb;
+  --color-syntax-string:    #16a34a;
+  --color-syntax-boolean:   #9333ea;
+  --color-syntax-number:    #ea580c;
+  --color-syntax-uuid:      #7c3aed;
+  --color-syntax-timestamp: #0891b2;
+  --color-syntax-url:       #0d9488;
+  --color-syntax-ip:        #0284c7;
+}
 
-/* Custom theme tokens - these become usable as Tailwind utilities */
-@theme {
-  /* Primary colors */
-  --color-primary: #0066FF;
-  --color-secondary: #FFFFFF;
-  --color-success: #28B47C;
-  --color-error: #E5484D;
-  --color-warning: #F59E0B;
-  
-  /* Text colors */
-  --color-text-main: #212934;
-  
-  /* Border colors */
-  --color-border-subtle: #D1D5DB;
-  
-  /* Background colors */
-  --color-bg-alt: #F9FAFB;
-  --color-bg-white: #FFFFFF;
+:root[data-mode="dark"] {
+  --color-syntax-key:       #60a5fa;
+  --color-syntax-string:    #4ade80;
+  --color-syntax-boolean:   #c084fc;
+  --color-syntax-number:    #fb923c;
+  --color-syntax-uuid:      #a78bfa;
+  --color-syntax-timestamp: #22d3ee;
+  --color-syntax-url:       #2dd4bf;
+  --color-syntax-ip:        #38bdf8;
 }
 
 /* Base styles */
@@ -44,28 +45,28 @@ html, body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #F9FAFB;
+  background: var(--color-kumo-recessed, #F9FAFB);
 }
 
-.dark ::-webkit-scrollbar-track {
-  background: #1F2937;
+:root[data-mode="dark"] ::-webkit-scrollbar-track {
+  background: var(--color-kumo-recessed, #1F2937);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D1D5DB;
+  background: var(--color-kumo-line, #D1D5DB);
   border-radius: 4px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #4B5563;
+:root[data-mode="dark"] ::-webkit-scrollbar-thumb {
+  background: var(--color-kumo-line, #4B5563);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9CA3AF;
+  background: var(--color-kumo-inactive, #9CA3AF);
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #6B7280;
+:root[data-mode="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-kumo-inactive, #6B7280);
 }
 
 /* Histogram bar hover effect */

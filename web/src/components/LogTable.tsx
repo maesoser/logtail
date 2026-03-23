@@ -305,7 +305,7 @@ export function LogTable({
                       {/* Resize handle */}
                       {!isContentCol && (
                         <div
-                          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors"
+                          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-kumo-brand transition-colors"
                           onMouseDown={(e) => handleResizeStart(e, col.key, getColumnWidth(col))}
                         />
                       )}
