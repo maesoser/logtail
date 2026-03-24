@@ -3,6 +3,7 @@ import { LayerCard, Tabs } from '@cloudflare/kumo';
 import { Popover } from '@cloudflare/kumo/primitives/popover';
 import type { HistogramBucket, SeverityCounts, TimeRange } from '../types';
 import { SEVERITY_LEVELS, TIME_RANGE_CONFIGS, VALID_TIME_RANGES } from '../types';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 
 interface ActivityHistogramProps {
   data: HistogramBucket[];
@@ -126,6 +127,7 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
   };
 
   const availableHeight = height - 8;
+  const isMobile = useIsMobile();
 
   return (
     <LayerCard>
@@ -136,9 +138,12 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
           value={timeRange}
           onValueChange={(v) => onTimeRangeChange(v as TimeRange)}
         />
-        <span className="text-xs text-kumo-subtle">
-          Peak: {maxCount.toLocaleString()} logs/{formatBucketSize(bucketMinutes)}
-        </span>
+        {!isMobile ? (
+          <span className="text-xs text-kumo-subtle">
+            Peak: {maxCount.toLocaleString()} logs/{formatBucketSize(bucketMinutes)}
+          </span>
+        ) : null}
+
       </LayerCard.Secondary>
       
       <LayerCard.Primary className="p-3">
