@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"crypto/subtle"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -148,6 +149,20 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// parseTimeParam parses a named RFC3339 query parameter.
+// Returns (nil, nil) when the parameter is absent.
+// Returns (nil, error) when the parameter is present but not valid RFC3339.
+func parseTimeParam(query string, paramName string) (*time.Time, error) {
+	if query == "" {
+		return nil, nil
+	}
+	t, err := time.Parse(time.RFC3339, query)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s: must be RFC3339 (e.g. 2006-01-02T15:04:05Z)", paramName)
+	}
+	return &t, nil
+}
+
 // shouldExclude checks if content contains any of the exclusion patterns
 func shouldExclude(content string, patterns []string) bool {
 	if len(patterns) == 0 {
@@ -218,17 +233,21 @@ func (h *Handlers) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
 		filter.Limit = 50
 	}
 
-	// Parse time range
-	if fromStr := query.Get("from"); fromStr != "" {
-		if from, err := time.Parse(time.RFC3339, fromStr); err == nil {
-			filter.From = &from
-		}
+	// Parse time range — return 400 on malformed timestamps so callers are
+	// not silently served unfiltered results.
+	from, err := parseTimeParam(query.Get("from"), "from")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	if toStr := query.Get("to"); toStr != "" {
-		if to, err := time.Parse(time.RFC3339, toStr); err == nil {
-			filter.To = &to
-		}
+	filter.From = from
+
+	to, err := parseTimeParam(query.Get("to"), "to")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+	filter.To = to
 
 	result := h.Buffer.Query(filter)
 
@@ -258,17 +277,20 @@ func (h *Handlers) HandleGetStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse time range
-	if fromStr := query.Get("from"); fromStr != "" {
-		if from, err := time.Parse(time.RFC3339, fromStr); err == nil {
-			filter.From = &from
-		}
+	// Parse time range — return 400 on malformed timestamps.
+	from, err := parseTimeParam(query.Get("from"), "from")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	if toStr := query.Get("to"); toStr != "" {
-		if to, err := time.Parse(time.RFC3339, toStr); err == nil {
-			filter.To = &to
-		}
+	filter.From = from
+
+	to, err := parseTimeParam(query.Get("to"), "to")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+	filter.To = to
 
 	// Parse histogram range preset (8h, 24h, 5d) - default to 24h
 	histConfig := models.GetHistogramConfig(query.Get("range"))
@@ -315,17 +337,20 @@ func (h *Handlers) HandleGetTopStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse time range
-	if fromStr := query.Get("from"); fromStr != "" {
-		if from, err := time.Parse(time.RFC3339, fromStr); err == nil {
-			filter.From = &from
-		}
+	// Parse time range — return 400 on malformed timestamps.
+	from, err := parseTimeParam(query.Get("from"), "from")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	if toStr := query.Get("to"); toStr != "" {
-		if to, err := time.Parse(time.RFC3339, toStr); err == nil {
-			filter.To = &to
-		}
+	filter.From = from
+
+	to, err := parseTimeParam(query.Get("to"), "to")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+	filter.To = to
 
 	// Parse limit (default: 10, max: 50)
 	limit := 10
