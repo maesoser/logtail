@@ -11,11 +11,11 @@ export function useTopStats(filter?: LogFilter, limit = 10) {
   // Memoize filter to prevent unnecessary refetches
   const filterKey = useMemo(() => {
     const parts: string[] = [`l:${limit}`];
-    if (filter?.client?.length) parts.push(`c:${filter.client.sort().join(',')}`);
-    if (filter?.hostname?.length) parts.push(`h:${filter.hostname.sort().join(',')}`);
-    if (filter?.tag?.length) parts.push(`t:${filter.tag.sort().join(',')}`);
+    if (filter?.client?.length) parts.push(`c:${[...filter.client].sort().join(',')}`);
+    if (filter?.hostname?.length) parts.push(`h:${[...filter.hostname].sort().join(',')}`);
+    if (filter?.tag?.length) parts.push(`t:${[...filter.tag].sort().join(',')}`);
     if (filter?.content) parts.push(`q:${filter.content}`);
-    if (filter?.severity?.length) parts.push(`s:${filter.severity.sort().join(',')}`);
+    if (filter?.severity?.length) parts.push(`s:${[...filter.severity].sort().join(',')}`);
     if (filter?.from) parts.push(`f:${filter.from}`);
     if (filter?.to) parts.push(`e:${filter.to}`);
     return parts.join('|');
