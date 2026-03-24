@@ -77,7 +77,7 @@ export interface TimeRangeConfig {
 // Predefined time range configurations
 export const TIME_RANGE_CONFIGS: Record<TimeRange, TimeRangeConfig> = {
   '8h': { value: '8h', label: '8 Hours', bucketMinutes: 5, description: '5-min buckets' },
-  '24h': { value: '24h', label: '24 Hours', bucketMinutes: 15, description: '15-min buckets' },
+  '24h': { value: '24h', label: '24 Hours', bucketMinutes: 10, description: '10-min buckets' },
   '5d': { value: '5d', label: '5 Days', bucketMinutes: 60, description: '1-hour buckets' },
   '21d': { value: '21d', label: '21 Days', bucketMinutes: 180, description: '3-hour buckets' },
 };
