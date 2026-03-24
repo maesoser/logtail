@@ -129,22 +129,22 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: -0.02em;
 }
 
-/* Selection — CF orange tint */
+/* Selection — brand tint */
 ::selection {
-  background-color: rgba(255, 72, 1, 0.2);
+  background-color: rgba(156, 122, 80, 0.2);
   color: var(--cf-text, #521000);
 }
 
-/* Focus states — CF orange ring */
+/* Focus states — brand ring */
 :focus-visible {
-  outline: 2px solid var(--cf-orange, #FF4801);
+  outline: 2px solid var(--cf-orange, #9C7A50);
   outline-offset: 2px;
 }
 
 button:focus-visible,
 [role="button"]:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 72, 1, 0.3);
+  box-shadow: 0 0 0 3px rgba(156, 122, 80, 0.3);
 }
 
 /* Button press micro-interaction */

@@ -78,15 +78,15 @@
       rgba(240, 227, 222, 0.30)
     );
 
-    /* Brand — CF orange */
+    /* Brand — antique tan */
     --color-kumo-brand: light-dark(
-      #FF4801,   /* cf-orange */
-      #F14602
+      #9C7A50,
+      #B8956A
     );
 
     --color-kumo-brand-hover: light-dark(
-      #FF7038,   /* cf-orange-hover */
-      #FF6D33
+      #7D6140,
+      #C9A87D
     );
 
     /* Semantic: danger / warning / info */
@@ -147,13 +147,13 @@
     );
 
     --text-color-kumo-brand: light-dark(
-      #FF4801,
-      #F14602
+      #9C7A50,
+      #B8956A
     );
 
     --text-color-kumo-link: light-dark(
-      #FF4801,
-      #FF7038
+      #9C7A50,
+      #C9A87D
     );
 
     --text-color-kumo-danger: light-dark(
@@ -178,9 +178,9 @@
 
 :root {
   /* Primary palette */
-  --cf-orange:             #FF4801;
-  --cf-orange-hover:       #FF7038;
-  --cf-orange-light:       rgba(255, 72, 1, 0.10);
+  --cf-orange:             #9C7A50;
+  --cf-orange-hover:       #7D6140;
+  --cf-orange-light:       rgba(156, 122, 80, 0.10);
   --cf-text:               #521000;
   --cf-text-muted:         rgba(82, 16, 0, 0.60);
   --cf-text-subtle:        rgba(82, 16, 0, 0.38);
@@ -202,7 +202,7 @@
   --cf-media-bg:           #F8EBEE;
 
   /* Provider comparison colors */
-  --cf-provider-cf:        #FF4801;
+  --cf-provider-cf:        #9C7A50;
   --cf-provider-aws:       #FF9900;
   --cf-provider-gcp:       #4285F4;
   --cf-provider-azure:     #0078D4;
@@ -210,9 +210,9 @@
 
 :root[data-mode="dark"] {
   /* Primary palette — dark overrides */
-  --cf-orange:             #F14602;
-  --cf-orange-hover:       #FF6D33;
-  --cf-orange-light:       rgba(241, 70, 2, 0.15);
+  --cf-orange:             #B8956A;
+  --cf-orange-hover:       #C9A87D;
+  --cf-orange-light:       rgba(184, 149, 106, 0.15);
   --cf-text:               #F0E3DE;
   --cf-text-muted:         rgba(255, 253, 251, 0.56);
   --cf-text-subtle:        rgba(255, 253, 251, 0.35);
