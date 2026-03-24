@@ -67,6 +67,11 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	// Get exclusion patterns
 	exclusionPatterns := h.Config.GetExclusionPatterns()
 
+	// Limit the total request body to 512 MB to prevent OOM from oversized payloads.
+	// Compressed gzip requests will be well under this; uncompressed JSONL is capped here.
+	const maxBodyBytes = 512 << 20 // 512 MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+
 	var reader io.Reader = r.Body
 
 	// Check if content is gzip-compressed
