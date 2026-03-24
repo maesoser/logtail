@@ -169,7 +169,7 @@ export function FilterPanel({
           >
             <FunnelIcon size={16} />
             {!isMobile && 'Filters'}
-            {hasActiveFilters && (
+            {!isMobile && hasActiveFilters && (
               <span className="bg-kumo-brand text-kumo-inverse text-xs rounded-full w-5 h-5 flex items-center justify-center">
                 !
               </span>
