@@ -82,17 +82,30 @@ func (h *Hub) Run() {
 			log.Printf("WebSocket client disconnected. Total clients: %d", len(h.clients))
 
 		case message := <-h.broadcast:
+			// First pass: attempt to send under a read lock, collecting
+			// clients whose send buffer is full so they can be evicted.
+			var toEvict []*Client
 			h.mu.RLock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
 				default:
-					// Client's buffer is full, close the connection
-					close(client.send)
-					delete(h.clients, client)
+					toEvict = append(toEvict, client)
 				}
 			}
 			h.mu.RUnlock()
+
+			// Second pass: evict slow clients under a write lock.
+			if len(toEvict) > 0 {
+				h.mu.Lock()
+				for _, client := range toEvict {
+					if _, ok := h.clients[client]; ok {
+						close(client.send)
+						delete(h.clients, client)
+					}
+				}
+				h.mu.Unlock()
+			}
 		}
 	}
 }
