@@ -8,9 +8,13 @@
  */
 
 /* ─── Kumo semantic token overrides ──────────────────────────────────────── */
+/*                                                                             */
+/* Must NOT use @layer here. Kumo's own tokens are defined via @theme, which  */
+/* Tailwind v4 compiles to an unlayered :root,:host block. Unlayered styles   */
+/* always beat @layer styles regardless of specificity or source order, so    */
+/* any override placed inside @layer base would silently lose.                */
 
-@layer base {
-  [data-theme="cloudflare"] {
+[data-theme="cloudflare"] {
 
     /* Surface hierarchy */
     --color-kumo-base: light-dark(
@@ -166,7 +170,6 @@
       #16A34A,
       #4ADE80
     );
-  }
 }
 
 /* ─── CF-specific tokens (product categories, providers, orange tints) ──── */
