@@ -152,6 +152,7 @@ func (s *ConfigStore) Get() Config {
 		},
 		Buffer: BufferConfig{
 			SizeMB:          s.config.Buffer.SizeMB,
+			RetentionDays:   s.config.Buffer.RetentionDays,
 			PersistPath:     s.config.Buffer.PersistPath,
 			AutoSaveMinutes: s.config.Buffer.AutoSaveMinutes,
 		},
@@ -178,6 +179,7 @@ func (s *ConfigStore) Update(config Config) error {
 		},
 		Buffer: BufferConfig{
 			SizeMB:          config.Buffer.SizeMB,
+			RetentionDays:   config.Buffer.RetentionDays,
 			PersistPath:     config.Buffer.PersistPath,
 			AutoSaveMinutes: config.Buffer.AutoSaveMinutes,
 		},
