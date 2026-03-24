@@ -64,6 +64,15 @@ export function useWebSocket({ onLogEntry, onTopStats }: WebSocketCallbacks) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Keep stable refs to the callbacks so that `connect` never needs to be
+  // recreated when the caller passes new function references (e.g. when
+  // filterKey changes inside useTopStats).  Without this, every filter change
+  // would cause a WebSocket disconnect/reconnect cycle.
+  const onLogEntryRef = useRef(onLogEntry);
+  const onTopStatsRef = useRef(onTopStats);
+  useEffect(() => { onLogEntryRef.current = onLogEntry; }, [onLogEntry]);
+  useEffect(() => { onTopStatsRef.current = onTopStats; }, [onTopStats]);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
@@ -88,9 +97,9 @@ export function useWebSocket({ onLogEntry, onTopStats }: WebSocketCallbacks) {
           for (const msgStr of messages) {
             const message = JSON.parse(msgStr);
             if (message.type === 'log_entry') {
-              onLogEntry(message.payload as LogEntry);
-            } else if (message.type === 'top_stats' && onTopStats) {
-              onTopStats(message.payload as TopStats);
+              onLogEntryRef.current(message.payload as LogEntry);
+            } else if (message.type === 'top_stats' && onTopStatsRef.current) {
+              onTopStatsRef.current(message.payload as TopStats);
             }
           }
         } catch (err) {
@@ -121,7 +130,7 @@ export function useWebSocket({ onLogEntry, onTopStats }: WebSocketCallbacks) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect');
     }
-  }, [onLogEntry, onTopStats]);
+  }, []); // stable — callbacks accessed via refs, not captured directly
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
