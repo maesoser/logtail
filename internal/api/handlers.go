@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"compress/gzip"
+	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"log"
@@ -53,11 +54,12 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check authorization if token is configured
+	// Check authorization if token is configured.
+	// Use constant-time comparison to prevent timing-based token oracle attacks.
 	ingestToken := h.Config.GetIngestToken()
 	if ingestToken != "" {
 		authHeader := r.Header.Get("Authorization")
-		if authHeader != ingestToken {
+		if subtle.ConstantTimeCompare([]byte(authHeader), []byte(ingestToken)) != 1 {
 			log.Println("Unauthorized ingest request: invalid or missing Authorization header")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
