@@ -70,7 +70,7 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			h.clients[client] = true
 			h.mu.Unlock()
-			log.Printf("WebSocket client connected. Total clients: %d", len(h.clients))
+			//log.Printf("WebSocket client connected. Total clients: %d", len(h.clients))
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -79,7 +79,7 @@ func (h *Hub) Run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
-			log.Printf("WebSocket client disconnected. Total clients: %d", len(h.clients))
+			//log.Printf("WebSocket client disconnected. Total clients: %d", len(h.clients))
 
 		case message := <-h.broadcast:
 			// First pass: attempt to send under a read lock, collecting

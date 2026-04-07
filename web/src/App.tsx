@@ -52,7 +52,7 @@ function App() {
   // Fetch data
   const { data: logsData, loading: logsLoading, refetch: refetchLogs } = useLogs(filter);
   const { stats, refetch: refetchStats } = useStats(10000, filter, timeRange);
-  const { data: topStats, loading: topStatsLoading, refetch: refetchTopStats, updateFromWebSocket: updateTopStats } = useTopStats(filter);
+  const { data: topStats, loading: topStatsLoading, refetch: refetchTopStats, updateFromWebSocket: updateTopStats } = useTopStats(filter, timeRange);
   
   // Fetch unique values for filter dropdowns
   const { values: uniqueClients } = useUniqueValues('client');

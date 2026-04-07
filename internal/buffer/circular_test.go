@@ -619,3 +619,42 @@ func TestCircularBuffer_BothSizeAndTimeEviction(t *testing.T) {
 		t.Error("buffer should have at least some entries")
 	}
 }
+
+func TestGetStats_TimestampsRespectFilter(t *testing.T) {
+	buf := New(10 * 1024 * 1024)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	old := now.Add(-2 * time.Hour)
+	mid := now.Add(-1 * time.Hour)
+	recent := now.Add(-10 * time.Minute)
+
+	for _, ts := range []time.Time{old, mid, recent} {
+		buf.Add(models.LogEntry{Timestamp: ts, Content: "msg", Severity: 6})
+	}
+
+	// Without filter: oldest should be "old"
+	unfiltered := buf.GetStats(nil, models.HistogramConfig24h)
+	if unfiltered.OldestTimestamp == nil {
+		t.Fatal("expected OldestTimestamp to be set without filter")
+	}
+	if !unfiltered.OldestTimestamp.Equal(old) {
+		t.Errorf("unfiltered: expected OldestTimestamp %v, got %v", old, *unfiltered.OldestTimestamp)
+	}
+
+	// With time range filter excluding the oldest entry:
+	// from = mid → only mid and recent qualify
+	filter := &models.LogFilter{From: &mid}
+	filtered := buf.GetStats(filter, models.HistogramConfig24h)
+	if filtered.OldestTimestamp == nil {
+		t.Fatal("expected OldestTimestamp to be set with filter")
+	}
+	if !filtered.OldestTimestamp.Equal(mid) {
+		t.Errorf("filtered: expected OldestTimestamp %v (matching filter), got %v", mid, *filtered.OldestTimestamp)
+	}
+	if filtered.NewestTimestamp == nil {
+		t.Fatal("expected NewestTimestamp to be set with filter")
+	}
+	if !filtered.NewestTimestamp.Equal(recent) {
+		t.Errorf("filtered: expected NewestTimestamp %v, got %v", recent, *filtered.NewestTimestamp)
+	}
+}

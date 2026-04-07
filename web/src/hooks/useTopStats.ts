@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { TopStats, LogFilter } from '../types';
+import type { TopStats, LogFilter, TimeRange } from '../types';
 
 const API_BASE = '';
 
-export function useTopStats(filter?: LogFilter, limit = 10) {
+export function useTopStats(filter?: LogFilter, timeRange: TimeRange = '24h', limit = 10) {
   const [data, setData] = useState<TopStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Memoize filter to prevent unnecessary refetches
   const filterKey = useMemo(() => {
-    const parts: string[] = [`l:${limit}`];
+    const parts: string[] = [`l:${limit}`, `r:${timeRange}`];
     if (filter?.client?.length) parts.push(`c:${[...filter.client].sort().join(',')}`);
     if (filter?.hostname?.length) parts.push(`h:${[...filter.hostname].sort().join(',')}`);
     if (filter?.tag?.length) parts.push(`t:${[...filter.tag].sort().join(',')}`);
@@ -19,12 +19,13 @@ export function useTopStats(filter?: LogFilter, limit = 10) {
     if (filter?.from) parts.push(`f:${filter.from}`);
     if (filter?.to) parts.push(`e:${filter.to}`);
     return parts.join('|');
-  }, [filter, limit]);
+  }, [filter, limit, timeRange]);
 
   const fetchTopStats = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       params.append('limit', limit.toString());
+      params.append('range', timeRange);
 
       if (filter?.client?.length) {
         filter.client.forEach(c => params.append('client', c));
@@ -61,7 +62,7 @@ export function useTopStats(filter?: LogFilter, limit = 10) {
     } finally {
       setLoading(false);
     }
-  }, [filterKey, limit]);
+  }, [filterKey, limit, timeRange]);
 
   useEffect(() => {
     fetchTopStats();

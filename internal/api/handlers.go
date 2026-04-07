@@ -163,6 +163,43 @@ func parseTimeParam(query string, paramName string) (*time.Time, error) {
 	return &t, nil
 }
 
+// parseRangeParam parses a duration range string like "24h", "1d", "30m".
+// Returns the calculated "from" time (now minus the duration) or nil if parsing fails.
+// Supported units: m (minutes), h (hours), d (days), w (weeks).
+func parseRangeParam(rangeStr string) (*time.Time, error) {
+	if rangeStr == "" {
+		return nil, nil
+	}
+
+	// Use regex pattern to parse duration: number followed by unit
+	var value int
+	var unit string
+	if _, err := fmt.Sscanf(rangeStr, "%d%s", &value, &unit); err != nil {
+		return nil, fmt.Errorf("invalid range format: %s (expected format like \"24h\", \"1d\")", rangeStr)
+	}
+
+	if value <= 0 {
+		return nil, fmt.Errorf("range value must be positive: %d", value)
+	}
+
+	var duration time.Duration
+	switch unit {
+	case "m", "min":
+		duration = time.Duration(value) * time.Minute
+	case "h", "hr":
+		duration = time.Duration(value) * time.Hour
+	case "d", "day":
+		duration = time.Duration(value) * 24 * time.Hour
+	case "w", "wk":
+		duration = time.Duration(value) * 7 * 24 * time.Hour
+	default:
+		return nil, fmt.Errorf("unsupported range unit: %s (supported: m, h, d, w)", unit)
+	}
+
+	from := time.Now().UTC().Add(-duration)
+	return &from, nil
+}
+
 // shouldExclude checks if content contains any of the exclusion patterns
 func shouldExclude(content string, patterns []string) bool {
 	if len(patterns) == 0 {
@@ -317,6 +354,7 @@ func (h *Handlers) HandleGetUniqueValues(w http.ResponseWriter, r *http.Request)
 
 // HandleGetTopStats handles GET /api/top
 // Returns the top N values for hostnames, tags, clients, and severity distribution
+// Accepts optional "range" query parameter (e.g., "24h", "1d", "30m") to infer the "from" time.
 func (h *Handlers) HandleGetTopStats(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
@@ -342,6 +380,16 @@ func (h *Handlers) HandleGetTopStats(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// If "from" is not provided but "range" is, calculate "from" from the range
+	if from == nil && query.Get("range") != "" {
+		rangeFrom, err := parseRangeParam(query.Get("range"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		from = rangeFrom
 	}
 	filter.From = from
 
@@ -387,7 +435,7 @@ func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) SetupWebSocketBroadcast() {
 	h.Buffer.SetOnChange(func(entry models.LogEntry) {
 		h.Hub.BroadcastLogEntry(entry)
-		log.Printf("Broadcasted log entry ID=%d to %d clients", entry.ID, h.Hub.ClientCount())
+		//log.Printf("Broadcasted log entry ID=%d to %d clients", entry.ID, h.Hub.ClientCount())
 	})
 }
 

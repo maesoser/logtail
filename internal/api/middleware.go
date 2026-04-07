@@ -5,26 +5,19 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"time"
 )
 
 // LoggingMiddleware logs all HTTP requests
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		//start := time.Now()
 
 		// Create a wrapped response writer to capture status code
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
 		next.ServeHTTP(wrapped, r)
 
-		log.Printf(
-			"%s %s %d %s",
-			r.Method,
-			r.URL.Path,
-			wrapped.statusCode,
-			time.Since(start),
-		)
+		//log.Printf( "%s %s %d %s", r.Method, r.URL.Path, wrapped.statusCode, time.Since(start),)
 	})
 }
 

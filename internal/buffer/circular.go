@@ -441,7 +441,12 @@ func (b *CircularBuffer) GetStats(filter *models.LogFilter, histConfig models.Hi
 		idx := (b.tail + i) % b.capacity
 		entry := b.entries[idx]
 
-		// Track oldest and newest (for all entries, not filtered)
+		// Apply full filter matching if filter is provided
+		if hasFilter && !b.matchesFilter(entry, *filter) {
+			continue
+		}
+
+		// Track oldest and newest among matched entries only
 		if oldest == nil || entry.Timestamp.Before(*oldest) {
 			ts := entry.Timestamp
 			oldest = &ts
@@ -449,11 +454,6 @@ func (b *CircularBuffer) GetStats(filter *models.LogFilter, histConfig models.Hi
 		if newest == nil || entry.Timestamp.After(*newest) {
 			ts := entry.Timestamp
 			newest = &ts
-		}
-
-		// Apply full filter matching if filter is provided
-		if hasFilter && !b.matchesFilter(entry, *filter) {
-			continue
 		}
 
 		// Calculate which bucket this entry belongs to based on aligned time
