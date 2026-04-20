@@ -47,6 +47,11 @@ func main() {
 	buf := buffer.NewWithOptions(cfg.BufferSizeBytes(), buffer.DefaultReorderWindow, cfg.RetentionDuration())
 	log.Printf("Initialized circular buffer with max size: %d MB, retention: %d days", cfg.Buffer.SizeMB, cfg.Buffer.RetentionDays)
 
+	// Start background retention eviction (runs every minute) so that entries
+	// older than the retention window are purged even when no new logs arrive.
+	buf.StartRetentionEviction(60 * time.Minute)
+	defer buf.Stop()
+
 	// Restore buffer from persistence file if configured
 	if cfg.Buffer.PersistPath != "" {
 		if err := buf.Load(cfg.Buffer.PersistPath); err != nil {

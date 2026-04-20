@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/logtail/logtail/internal/buffer"
@@ -18,19 +20,71 @@ import (
 	"github.com/logtail/logtail/internal/websocket"
 )
 
+// LatencyMetrics tracks latency statistics for different operations
+type LatencyMetrics struct {
+	mu      sync.RWMutex
+	count   int64
+	totalMs int64
+	minMs   int64
+	maxMs   int64
+}
+
+// Record records a latency measurement in milliseconds
+func (m *LatencyMetrics) Record(duration time.Duration) {
+	ms := duration.Milliseconds()
+	atomic.AddInt64(&m.count, 1)
+	atomic.AddInt64(&m.totalMs, ms)
+
+	m.mu.Lock()
+	if m.minMs == 0 || ms < m.minMs {
+		m.minMs = ms
+	}
+	if ms > m.maxMs {
+		m.maxMs = ms
+	}
+	m.mu.Unlock()
+}
+
+// Get returns the current latency statistics
+func (m *LatencyMetrics) Get() map[string]int64 {
+	m.mu.RLock()
+	minMs := m.minMs
+	maxMs := m.maxMs
+	m.mu.RUnlock()
+
+	count := atomic.LoadInt64(&m.count)
+	totalMs := atomic.LoadInt64(&m.totalMs)
+
+	var avgMs int64
+	if count > 0 {
+		avgMs = totalMs / count
+	}
+
+	return map[string]int64{
+		"count": count,
+		"avgMs": avgMs,
+		"minMs": minMs,
+		"maxMs": maxMs,
+	}
+}
+
 // Handlers contains all HTTP handler functions
 type Handlers struct {
-	Buffer *buffer.CircularBuffer
-	Hub    *websocket.Hub
-	Config *models.ConfigStore
+	Buffer        *buffer.CircularBuffer
+	Hub           *websocket.Hub
+	Config        *models.ConfigStore
+	IngestLatency *LatencyMetrics
+	QueryLatency  *LatencyMetrics
 }
 
 // NewHandlers creates a new Handlers instance
 func NewHandlers(buf *buffer.CircularBuffer, hub *websocket.Hub, config *models.ConfigStore) *Handlers {
 	return &Handlers{
-		Buffer: buf,
-		Hub:    hub,
-		Config: config,
+		Buffer:        buf,
+		Hub:           hub,
+		Config:        config,
+		IngestLatency: &LatencyMetrics{},
+		QueryLatency:  &LatencyMetrics{},
 	}
 }
 
@@ -49,6 +103,11 @@ type IngestResponseExtended struct {
 
 // HandleIngest handles POST /ingest for gzip-compressed JSONL payloads
 func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() {
+		h.IngestLatency.Record(time.Since(start))
+	}()
+
 	if r.Method != http.MethodPost {
 		log.Println("Invalid method for /ingest:", r.Method)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -152,15 +211,18 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 // parseTimeParam parses a named RFC3339 query parameter.
 // Returns (nil, nil) when the parameter is absent.
 // Returns (nil, error) when the parameter is present but not valid RFC3339.
+// Accepts both RFC3339 (seconds precision) and RFC3339Nano (sub-second precision,
+// as produced by JavaScript's Date.toISOString()).
 func parseTimeParam(query string, paramName string) (*time.Time, error) {
 	if query == "" {
 		return nil, nil
 	}
-	t, err := time.Parse(time.RFC3339, query)
-	if err != nil {
-		return nil, fmt.Errorf("invalid %s: must be RFC3339 (e.g. 2006-01-02T15:04:05Z)", paramName)
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+		if t, err := time.Parse(layout, query); err == nil {
+			return &t, nil
+		}
 	}
-	return &t, nil
+	return nil, fmt.Errorf("invalid %s: must be RFC3339 (e.g. 2006-01-02T15:04:05Z)", paramName)
 }
 
 // parseRangeParam parses a duration range string like "24h", "1d", "30m".
@@ -233,6 +295,11 @@ func filterEmptyStrings(s []string) []string {
 
 // HandleGetLogs handles GET /api/logs with filtering and pagination
 func (h *Handlers) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	defer func() {
+		h.QueryLatency.Record(time.Since(start))
+	}()
+
 	query := r.URL.Query()
 
 	filter := models.LogFilter{
@@ -428,6 +495,10 @@ func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		"bufferSizeBytes": h.Buffer.MaxSizeBytes(),
 		"bufferUsedBytes": h.Buffer.CurrentSizeBytes(),
 		"wsClients":       h.Hub.ClientCount(),
+		"latency": map[string]interface{}{
+			"ingest": h.IngestLatency.Get(),
+			"query":  h.QueryLatency.Get(),
+		},
 	})
 }
 

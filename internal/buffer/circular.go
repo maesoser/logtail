@@ -34,6 +34,7 @@ type CircularBuffer struct {
 	onChange          func(entry models.LogEntry) // Callback for new entries
 	reorderWindow     time.Duration               // Time window for reordering out-of-order logs
 	retentionDuration time.Duration               // Maximum age for entries (0 = disabled)
+	stopCh            chan struct{}               // Closed to stop the background eviction goroutine
 }
 
 // New creates a new circular buffer with the specified maximum size in bytes.
@@ -85,6 +86,62 @@ func (b *CircularBuffer) SetOnChange(fn func(entry models.LogEntry)) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.onChange = fn
+}
+
+// StartRetentionEviction starts a background goroutine that periodically evicts
+// entries older than the retention duration. It is a no-op when retentionDuration
+// is 0 (disabled). Call Stop to terminate the goroutine.
+func (b *CircularBuffer) StartRetentionEviction(interval time.Duration) {
+	if b.retentionDuration <= 0 {
+		return
+	}
+	b.mu.Lock()
+	if b.stopCh != nil {
+		// Already running
+		b.mu.Unlock()
+		return
+	}
+	b.stopCh = make(chan struct{})
+	b.mu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				b.evictExpired()
+			case <-b.stopCh:
+				return
+			}
+		}
+	}()
+}
+
+// evictExpired removes all entries older than the retention duration.
+// Safe to call concurrently with Add and Query.
+func (b *CircularBuffer) evictExpired() {
+	if b.retentionDuration <= 0 {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	cutoff := time.Now().Add(-b.retentionDuration)
+	for b.count > 0 && b.entries[b.tail].Timestamp.Before(cutoff) {
+		b.evictOldest()
+	}
+}
+
+// Stop terminates the background retention-eviction goroutine started by
+// StartRetentionEviction. Calling Stop on a buffer that has no running
+// goroutine is a no-op.
+func (b *CircularBuffer) Stop() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.stopCh != nil {
+		close(b.stopCh)
+		b.stopCh = nil
+	}
 }
 
 // Add adds a new log entry to the buffer, inserting it in timestamp order

@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 )
 
@@ -117,9 +118,14 @@ func (p *IngestPayload) ToLogEntry(id uint64) (*LogEntry, error) {
 		ts = time.Now()
 	}
 
+	client := p.Client
+	if host, _, err := net.SplitHostPort(client); err == nil {
+		client = host
+	}
+
 	entry := &LogEntry{
 		ID:        id,
-		Client:    p.Client,
+		Client:    client,
 		Facility:  p.Facility,
 		Hostname:  p.Hostname,
 		Priority:  p.Priority,

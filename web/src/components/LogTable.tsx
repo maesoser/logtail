@@ -193,7 +193,7 @@ export function LogTable({
         const badgeStyle = getSeverityBadgeStyle(value as number);
         return (
           <span 
-            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs uppercase font-medium"
+            className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs uppercase font-medium"
             style={badgeStyle}
           >
             {severity.name}
@@ -325,7 +325,7 @@ export function LogTable({
                     {visibleColumns.map(col => (
                       <Table.Cell
                         key={`${entry.id}-${col.key}`}
-                        className={`py-0.5 px-1.5 ${col.key === 'content' ? 'max-w-0' : ''}`}
+                        className={`!py-1 px-1.5 ${col.key === 'content' ? 'max-w-0' : ''}`}
                       >
                         {renderCellContent(entry, col)}
                       </Table.Cell>
