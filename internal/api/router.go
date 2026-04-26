@@ -52,6 +52,9 @@ func NewRouter(buf *buffer.CircularBuffer, hub *websocket.Hub, webAssets embed.F
 		r.Put("/config", handlers.HandleUpdateConfig)
 	})
 
+	// MCP endpoint (JSON-RPC 2.0)
+	r.Post("/mcp", handlers.HandleMCP)
+
 	// Ingest endpoint
 	r.Post("/ingest", handlers.HandleIngest)
 
@@ -103,7 +106,7 @@ func spaHandler(staticFS http.FileSystem) http.HandlerFunc {
 		f, err := staticFS.Open(path)
 		if err != nil {
 			// For API routes or websocket, don't serve index.html
-			if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/ws") || strings.HasPrefix(path, "/ingest") || strings.HasPrefix(path, "/health") {
+			if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/ws") || strings.HasPrefix(path, "/ingest") || strings.HasPrefix(path, "/health") || strings.HasPrefix(path, "/mcp") {
 				http.NotFound(w, r)
 				return
 			}
