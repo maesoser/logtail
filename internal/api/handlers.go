@@ -126,8 +126,9 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get exclusion patterns
+	// Get exclusion patterns and reclassify config
 	exclusionPatterns := h.Config.GetExclusionPatterns()
+	reclassifyConfig := h.Config.GetReclassifyConfig()
 
 	// Limit the total request body to 512 MB to prevent OOM from oversized payloads.
 	// Compressed gzip requests will be well under this; uncompressed JSONL is capped here.
@@ -181,6 +182,9 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 			excluded++
 			continue
 		}
+
+		// Optionally reclassify severity based on content patterns
+		applyReclassification(entry, reclassifyConfig)
 
 		h.Buffer.Add(*entry)
 		ingested++
@@ -263,6 +267,35 @@ func parseRangeParam(rangeStr string) (*time.Time, error) {
 }
 
 // shouldExclude checks if content contains any of the exclusion patterns
+// applyReclassification checks whether the log entry's severity should be overridden
+// based on content pattern matches and the active reclassify configuration.
+// It mutates the entry in place and sets Reclassified=true if a change was made.
+func applyReclassification(entry *models.LogEntry, cfg models.ReclassifyConfig) {
+	contentLower := strings.ToLower(entry.Content)
+
+	// INFO (6) → ERROR (3) when content matches an error pattern
+	if cfg.InfoToError && entry.Severity == int(models.SeverityInfo) {
+		for _, pattern := range cfg.InfoToErrorPatterns {
+			if pattern != "" && strings.Contains(contentLower, strings.ToLower(pattern)) {
+				entry.Severity = int(models.SeverityError)
+				entry.Reclassified = true
+				return
+			}
+		}
+	}
+
+	// ERROR (3) → WARNING (4) when content matches a warning pattern
+	if cfg.ErrorToWarning && entry.Severity == int(models.SeverityError) {
+		for _, pattern := range cfg.ErrorToWarningPatterns {
+			if pattern != "" && strings.Contains(contentLower, strings.ToLower(pattern)) {
+				entry.Severity = int(models.SeverityWarning)
+				entry.Reclassified = true
+				return
+			}
+		}
+	}
+}
+
 func shouldExclude(content string, patterns []string) bool {
 	if len(patterns) == 0 {
 		return false
@@ -526,6 +559,12 @@ type ConfigResponse struct {
 		PersistPath     string `json:"persistPath"`
 		AutoSaveMinutes int    `json:"autoSaveMinutes"`
 	} `json:"buffer"`
+	Reclassify struct {
+		InfoToError            bool     `json:"infoToError"`
+		InfoToErrorPatterns    []string `json:"infoToErrorPatterns"`
+		ErrorToWarning         bool     `json:"errorToWarning"`
+		ErrorToWarningPatterns []string `json:"errorToWarningPatterns"`
+	} `json:"reclassify"`
 	ConfigFile string `json:"configFile"`
 }
 
@@ -544,6 +583,12 @@ type ConfigUpdateRequest struct {
 		PersistPath     *string `json:"persistPath,omitempty"`
 		AutoSaveMinutes *int    `json:"autoSaveMinutes,omitempty"`
 	} `json:"buffer,omitempty"`
+	Reclassify *struct {
+		InfoToError            *bool    `json:"infoToError,omitempty"`
+		InfoToErrorPatterns    []string `json:"infoToErrorPatterns,omitempty"`
+		ErrorToWarning         *bool    `json:"errorToWarning,omitempty"`
+		ErrorToWarningPatterns []string `json:"errorToWarningPatterns,omitempty"`
+	} `json:"reclassify,omitempty"`
 }
 
 // HandleGetConfig handles GET /api/config
@@ -560,6 +605,10 @@ func (h *Handlers) HandleGetConfig(w http.ResponseWriter, r *http.Request) {
 	response.Buffer.RetentionDays = config.Buffer.RetentionDays
 	response.Buffer.PersistPath = config.Buffer.PersistPath
 	response.Buffer.AutoSaveMinutes = config.Buffer.AutoSaveMinutes
+	response.Reclassify.InfoToError = config.Reclassify.InfoToError
+	response.Reclassify.InfoToErrorPatterns = config.Reclassify.InfoToErrorPatterns
+	response.Reclassify.ErrorToWarning = config.Reclassify.ErrorToWarning
+	response.Reclassify.ErrorToWarningPatterns = config.Reclassify.ErrorToWarningPatterns
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -602,6 +651,20 @@ func (h *Handlers) HandleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 			current.Buffer.AutoSaveMinutes = *req.Buffer.AutoSaveMinutes
 		}
 	}
+	if req.Reclassify != nil {
+		if req.Reclassify.InfoToError != nil {
+			current.Reclassify.InfoToError = *req.Reclassify.InfoToError
+		}
+		if req.Reclassify.InfoToErrorPatterns != nil {
+			current.Reclassify.InfoToErrorPatterns = req.Reclassify.InfoToErrorPatterns
+		}
+		if req.Reclassify.ErrorToWarning != nil {
+			current.Reclassify.ErrorToWarning = *req.Reclassify.ErrorToWarning
+		}
+		if req.Reclassify.ErrorToWarningPatterns != nil {
+			current.Reclassify.ErrorToWarningPatterns = req.Reclassify.ErrorToWarningPatterns
+		}
+	}
 
 	// Save updated config
 	if err := h.Config.Update(current); err != nil {
@@ -621,6 +684,10 @@ func (h *Handlers) HandleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	response.Buffer.RetentionDays = current.Buffer.RetentionDays
 	response.Buffer.PersistPath = current.Buffer.PersistPath
 	response.Buffer.AutoSaveMinutes = current.Buffer.AutoSaveMinutes
+	response.Reclassify.InfoToError = current.Reclassify.InfoToError
+	response.Reclassify.InfoToErrorPatterns = current.Reclassify.InfoToErrorPatterns
+	response.Reclassify.ErrorToWarning = current.Reclassify.ErrorToWarning
+	response.Reclassify.ErrorToWarningPatterns = current.Reclassify.ErrorToWarningPatterns
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)

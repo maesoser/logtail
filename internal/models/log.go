@@ -9,15 +9,16 @@ import (
 
 // LogEntry represents a single log entry with syslog-style fields
 type LogEntry struct {
-	ID        uint64    `json:"id"`
-	Client    string    `json:"client"`
-	Facility  int       `json:"facility"`
-	Hostname  string    `json:"hostname"`
-	Priority  int       `json:"priority"`
-	Severity  int       `json:"severity"`
-	Tag       string    `json:"tag"`
-	Timestamp time.Time `json:"timestamp"`
-	Content   string    `json:"content"`
+	ID           uint64    `json:"id"`
+	Client       string    `json:"client"`
+	Facility     int       `json:"facility"`
+	Hostname     string    `json:"hostname"`
+	Priority     int       `json:"priority"`
+	Severity     int       `json:"severity"`
+	Tag          string    `json:"tag"`
+	Timestamp    time.Time `json:"timestamp"`
+	Content      string    `json:"content"`
+	Reclassified bool      `json:"reclassified,omitempty"`
 }
 
 // SeverityLevel represents syslog severity levels

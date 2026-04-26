@@ -10,7 +10,8 @@ import {
   ShieldCheckIcon, 
   ColumnsIcon,
   FunnelIcon, 
-  GearIcon
+  GearIcon,
+  ArrowsCounterClockwiseIcon,
 } from '@phosphor-icons/react';
 import type { ColumnConfig } from '../types';
 
@@ -29,6 +30,12 @@ interface BackendConfig {
     persistPath: string;
     autoSaveMinutes: number;
   };
+  reclassify: {
+    infoToError: boolean;
+    infoToErrorPatterns: string[];
+    errorToWarning: boolean;
+    errorToWarningPatterns: string[];
+  };
   configFile: string;
 }
 
@@ -38,7 +45,7 @@ interface SettingsProps {
   onResetColumns?: () => void;
 }
 
-type TabId = 'columns' | 'server' | 'auth' | 'exclusions';
+type TabId = 'columns' | 'server' | 'auth' | 'exclusions' | 'reclassify';
 
 export function Settings({
   columns,
@@ -72,6 +79,15 @@ export function Settings({
   const [newPattern, setNewPattern] = useState('');
   const [exclusionsDirty, setExclusionsDirty] = useState(false);
 
+  // Reclassify state
+  const [infoToError, setInfoToError] = useState(false);
+  const [infoToErrorPatterns, setInfoToErrorPatterns] = useState<string[]>([]);
+  const [newInfoToErrorPattern, setNewInfoToErrorPattern] = useState('');
+  const [errorToWarning, setErrorToWarning] = useState(false);
+  const [errorToWarningPatterns, setErrorToWarningPatterns] = useState<string[]>([]);
+  const [newErrorToWarningPattern, setNewErrorToWarningPattern] = useState('');
+  const [reclassifyDirty, setReclassifyDirty] = useState(false);
+
   // Fetch backend config when dialog opens
   useEffect(() => {
     if (isOpen) {
@@ -98,6 +114,11 @@ export function Settings({
         // Don't set authToken - we never receive the actual token from backend
         setAuthToken('');
         setTokenDirty(false);
+        setInfoToError(data.reclassify?.infoToError ?? false);
+        setInfoToErrorPatterns(data.reclassify?.infoToErrorPatterns ?? []);
+        setErrorToWarning(data.reclassify?.errorToWarning ?? false);
+        setErrorToWarningPatterns(data.reclassify?.errorToWarningPatterns ?? []);
+        setReclassifyDirty(false);
       }
     } catch (err) {
       console.error('Failed to fetch config:', err);
@@ -111,6 +132,7 @@ export function Settings({
     server?: { port?: number };
     ingest?: { authToken?: string; exclusionPatterns?: string[] };
     buffer?: { sizeMB?: number; retentionDays?: number; persistPath?: string; autoSaveMinutes?: number };
+    reclassify?: { infoToError?: boolean; infoToErrorPatterns?: string[]; errorToWarning?: boolean; errorToWarningPatterns?: string[] };
   }) => {
     setSaving(true);
     setError(null);
@@ -134,6 +156,13 @@ export function Settings({
         if (updates.ingest?.authToken !== undefined) {
           setAuthToken('');
           setTokenDirty(false);
+        }
+        if (updates.reclassify !== undefined) {
+          setInfoToError(data.reclassify?.infoToError ?? false);
+          setInfoToErrorPatterns(data.reclassify?.infoToErrorPatterns ?? []);
+          setErrorToWarning(data.reclassify?.errorToWarning ?? false);
+          setErrorToWarningPatterns(data.reclassify?.errorToWarningPatterns ?? []);
+          setReclassifyDirty(false);
         }
       } else {
         const text = await response.text();
@@ -191,8 +220,37 @@ export function Settings({
     setExclusionsDirty(true);
   };
 
+  // Reclassify pattern handlers
+  const handleAddInfoToErrorPattern = useCallback(() => {
+    const trimmed = newInfoToErrorPattern.trim();
+    if (trimmed && !infoToErrorPatterns.includes(trimmed)) {
+      setInfoToErrorPatterns(prev => [...prev, trimmed]);
+      setNewInfoToErrorPattern('');
+      setReclassifyDirty(true);
+    }
+  }, [newInfoToErrorPattern, infoToErrorPatterns]);
+
+  const handleRemoveInfoToErrorPattern = (index: number) => {
+    setInfoToErrorPatterns(prev => prev.filter((_, i) => i !== index));
+    setReclassifyDirty(true);
+  };
+
+  const handleAddErrorToWarningPattern = useCallback(() => {
+    const trimmed = newErrorToWarningPattern.trim();
+    if (trimmed && !errorToWarningPatterns.includes(trimmed)) {
+      setErrorToWarningPatterns(prev => [...prev, trimmed]);
+      setNewErrorToWarningPattern('');
+      setReclassifyDirty(true);
+    }
+  }, [newErrorToWarningPattern, errorToWarningPatterns]);
+
+  const handleRemoveErrorToWarningPattern = (index: number) => {
+    setErrorToWarningPatterns(prev => prev.filter((_, i) => i !== index));
+    setReclassifyDirty(true);
+  };
+
   // Check if any settings have been modified
-  const hasUnsavedChanges = serverDirty || tokenDirty || exclusionsDirty;
+  const hasUnsavedChanges = serverDirty || tokenDirty || exclusionsDirty || reclassifyDirty;
 
   // Save all pending changes
   const handleSaveAll = async () => {
@@ -202,6 +260,7 @@ export function Settings({
       server?: { port?: number };
       ingest?: { authToken?: string; exclusionPatterns?: string[] };
       buffer?: { sizeMB?: number; retentionDays?: number; persistPath?: string; autoSaveMinutes?: number };
+      reclassify?: { infoToError?: boolean; infoToErrorPatterns?: string[]; errorToWarning?: boolean; errorToWarningPatterns?: string[] };
     } = {};
 
     if (serverDirty) {
@@ -222,6 +281,15 @@ export function Settings({
       updates.ingest = { ...updates.ingest, exclusionPatterns };
     }
 
+    if (reclassifyDirty) {
+      updates.reclassify = {
+        infoToError,
+        infoToErrorPatterns,
+        errorToWarning,
+        errorToWarningPatterns,
+      };
+    }
+
     await saveConfig(updates);
   };
 
@@ -232,6 +300,7 @@ export function Settings({
     { id: 'server', label: 'Server', icon: <GearIcon size={16} /> },
     { id: 'auth', label: 'Auth', icon: <ShieldCheckIcon size={16} /> },
     { id: 'exclusions', label: 'Exclusions', icon: <FunnelIcon size={16} /> },
+    { id: 'reclassify', label: 'Reclassify', icon: <ArrowsCounterClockwiseIcon size={16} /> },
   ];
 
   return (
@@ -531,6 +600,150 @@ export function Settings({
                         </Button>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Reclassify Tab */}
+              {activeTab === 'reclassify' && (
+                <div className="space-y-6">
+                  <p className="text-sm text-kumo-subtle">
+                    Override log severity at ingest time when the message content contradicts the declared level.
+                    Reclassified entries are marked with a <span className="font-mono text-xs bg-kumo-tint border border-kumo-line rounded px-1 py-0.5">~</span> indicator in the UI.
+                  </p>
+
+                  {/* INFO → ERROR */}
+                  <div className="border border-kumo-line rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium text-kumo-default">INFO → ERROR</h4>
+                        <p className="text-xs text-kumo-inactive mt-0.5">
+                          Promote <span className="font-mono">INFO</span> logs to <span className="font-mono">ERROR</span> when the content matches any of the patterns below.
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={infoToError}
+                          onCheckedChange={(checked) => {
+                            setInfoToError(checked === true);
+                            setReclassifyDirty(true);
+                          }}
+                        />
+                        <span className="text-sm text-kumo-default">Enabled</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className="flex gap-2 mb-2">
+                        <Input
+                          value={newInfoToErrorPattern}
+                          onChange={(e) => setNewInfoToErrorPattern(e.target.value)}
+                          placeholder='e.g., level=error, "level":"error"'
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddInfoToErrorPattern(); } }}
+                          aria-label="New INFO→ERROR pattern"
+                          className="flex-1"
+                          disabled={!infoToError}
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={handleAddInfoToErrorPattern}
+                          disabled={!infoToError || !newInfoToErrorPattern.trim()}
+                          aria-label="Add pattern"
+                        >
+                          <PlusIcon size={16} />
+                        </Button>
+                      </div>
+                      {infoToErrorPatterns.length === 0 ? (
+                        <p className="text-sm text-kumo-inactive py-3 text-center border border-dashed border-kumo-line rounded">
+                          No patterns — add at least one to enable detection.
+                        </p>
+                      ) : (
+                        <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                          {infoToErrorPatterns.map((pattern, index) => (
+                            <li key={index} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-kumo-tint rounded border border-kumo-line">
+                              <code className="text-xs font-mono text-kumo-default truncate flex-1">{pattern}</code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                shape="square"
+                                onClick={() => handleRemoveInfoToErrorPattern(index)}
+                                aria-label={`Remove pattern "${pattern}"`}
+                                className="text-kumo-danger hover:bg-kumo-danger-tint"
+                              >
+                                <TrashIcon size={14} />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ERROR → WARNING */}
+                  <div className="border border-kumo-line rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium text-kumo-default">ERROR → WARNING</h4>
+                        <p className="text-xs text-kumo-inactive mt-0.5">
+                          Demote <span className="font-mono">ERROR</span> logs to <span className="font-mono">WARNING</span> when the content matches any of the patterns below.
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={errorToWarning}
+                          onCheckedChange={(checked) => {
+                            setErrorToWarning(checked === true);
+                            setReclassifyDirty(true);
+                          }}
+                        />
+                        <span className="text-sm text-kumo-default">Enabled</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className="flex gap-2 mb-2">
+                        <Input
+                          value={newErrorToWarningPattern}
+                          onChange={(e) => setNewErrorToWarningPattern(e.target.value)}
+                          placeholder='e.g., level=warn, "level":"warning"'
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddErrorToWarningPattern(); } }}
+                          aria-label="New ERROR→WARNING pattern"
+                          className="flex-1"
+                          disabled={!errorToWarning}
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={handleAddErrorToWarningPattern}
+                          disabled={!errorToWarning || !newErrorToWarningPattern.trim()}
+                          aria-label="Add pattern"
+                        >
+                          <PlusIcon size={16} />
+                        </Button>
+                      </div>
+                      {errorToWarningPatterns.length === 0 ? (
+                        <p className="text-sm text-kumo-inactive py-3 text-center border border-dashed border-kumo-line rounded">
+                          No patterns — add at least one to enable detection.
+                        </p>
+                      ) : (
+                        <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                          {errorToWarningPatterns.map((pattern, index) => (
+                            <li key={index} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-kumo-tint rounded border border-kumo-line">
+                              <code className="text-xs font-mono text-kumo-default truncate flex-1">{pattern}</code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                shape="square"
+                                onClick={() => handleRemoveErrorToWarningPattern(index)}
+                                aria-label={`Remove pattern "${pattern}"`}
+                                className="text-kumo-danger hover:bg-kumo-danger-tint"
+                              >
+                                <TrashIcon size={14} />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

@@ -9,6 +9,7 @@ export interface LogEntry {
   tag: string;
   timestamp: string;
   content: string;
+  reclassified?: boolean;
 }
 
 // Filter parameters for querying logs

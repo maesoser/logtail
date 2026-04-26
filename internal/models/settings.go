@@ -18,6 +18,9 @@ type Config struct {
 
 	// Buffer settings
 	Buffer BufferConfig `yaml:"buffer" json:"buffer"`
+
+	// Reclassify settings
+	Reclassify ReclassifyConfig `yaml:"reclassify" json:"reclassify"`
 }
 
 // ServerConfig contains HTTP server configuration
@@ -35,6 +38,21 @@ type IngestConfig struct {
 	// ExclusionPatterns is a list of strings that, if found in a log message,
 	// will cause that message to be discarded during ingestion
 	ExclusionPatterns []string `yaml:"exclusion_patterns" json:"exclusionPatterns"`
+}
+
+// ReclassifyConfig contains content-based severity reclassification settings
+type ReclassifyConfig struct {
+	// InfoToError enables reclassification of INFO logs to ERROR when content matches a pattern
+	InfoToError bool `yaml:"info_to_error" json:"infoToError"`
+
+	// InfoToErrorPatterns is the list of case-insensitive substrings that trigger INFO→ERROR reclassification
+	InfoToErrorPatterns []string `yaml:"info_to_error_patterns" json:"infoToErrorPatterns"`
+
+	// ErrorToWarning enables reclassification of ERROR logs to WARNING when content matches a pattern
+	ErrorToWarning bool `yaml:"error_to_warning" json:"errorToWarning"`
+
+	// ErrorToWarningPatterns is the list of case-insensitive substrings that trigger ERROR→WARNING reclassification
+	ErrorToWarningPatterns []string `yaml:"error_to_warning_patterns" json:"errorToWarningPatterns"`
 }
 
 // BufferConfig contains buffer configuration
@@ -55,6 +73,26 @@ type BufferConfig struct {
 	AutoSaveMinutes int `yaml:"auto_save_minutes,omitempty" json:"autoSaveMinutes"`
 }
 
+// DefaultInfoToErrorPatterns returns the built-in patterns used to detect errors in INFO logs
+func DefaultInfoToErrorPatterns() []string {
+	return []string{
+		"level=error", "level=fatal", "level=critical",
+		"[error]", "[fatal]", "[critical]",
+		`"level":"error"`, `"level":"fatal"`, `"level":"critical"`,
+		"error:", "fatal:", "critical:",
+	}
+}
+
+// DefaultErrorToWarningPatterns returns the built-in patterns used to detect warnings in ERROR logs
+func DefaultErrorToWarningPatterns() []string {
+	return []string{
+		"level=warn", "level=warning",
+		"[warn]", "[warning]",
+		`"level":"warn"`, `"level":"warning"`,
+		"warn:", "warning:",
+	}
+}
+
 // DefaultConfig returns the default configuration
 func DefaultConfig() Config {
 	return Config{
@@ -68,6 +106,12 @@ func DefaultConfig() Config {
 		Buffer: BufferConfig{
 			SizeMB:        100,
 			RetentionDays: 30,
+		},
+		Reclassify: ReclassifyConfig{
+			InfoToError:            false,
+			InfoToErrorPatterns:    DefaultInfoToErrorPatterns(),
+			ErrorToWarning:         false,
+			ErrorToWarningPatterns: DefaultErrorToWarningPatterns(),
 		},
 	}
 }
@@ -156,6 +200,12 @@ func (s *ConfigStore) Get() Config {
 			PersistPath:     s.config.Buffer.PersistPath,
 			AutoSaveMinutes: s.config.Buffer.AutoSaveMinutes,
 		},
+		Reclassify: ReclassifyConfig{
+			InfoToError:            s.config.Reclassify.InfoToError,
+			InfoToErrorPatterns:    append([]string{}, s.config.Reclassify.InfoToErrorPatterns...),
+			ErrorToWarning:         s.config.Reclassify.ErrorToWarning,
+			ErrorToWarningPatterns: append([]string{}, s.config.Reclassify.ErrorToWarningPatterns...),
+		},
 	}
 }
 
@@ -182,6 +232,12 @@ func (s *ConfigStore) Update(config Config) error {
 			RetentionDays:   config.Buffer.RetentionDays,
 			PersistPath:     config.Buffer.PersistPath,
 			AutoSaveMinutes: config.Buffer.AutoSaveMinutes,
+		},
+		Reclassify: ReclassifyConfig{
+			InfoToError:            config.Reclassify.InfoToError,
+			InfoToErrorPatterns:    append([]string{}, config.Reclassify.InfoToErrorPatterns...),
+			ErrorToWarning:         config.Reclassify.ErrorToWarning,
+			ErrorToWarningPatterns: append([]string{}, config.Reclassify.ErrorToWarningPatterns...),
 		},
 	}
 
@@ -238,6 +294,18 @@ func (s *ConfigStore) GetPersistPath() string {
 	return s.config.Buffer.PersistPath
 }
 
+// GetReclassifyConfig returns a copy of the current reclassify configuration
+func (s *ConfigStore) GetReclassifyConfig() ReclassifyConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return ReclassifyConfig{
+		InfoToError:            s.config.Reclassify.InfoToError,
+		InfoToErrorPatterns:    append([]string{}, s.config.Reclassify.InfoToErrorPatterns...),
+		ErrorToWarning:         s.config.Reclassify.ErrorToWarning,
+		ErrorToWarningPatterns: append([]string{}, s.config.Reclassify.ErrorToWarningPatterns...),
+	}
+}
+
 // GetAutoSaveMinutes returns the auto-save interval in minutes
 func (s *ConfigStore) GetAutoSaveMinutes() int {
 	s.mu.RLock()
@@ -257,9 +325,15 @@ func (s *ConfigStore) loadFromFile() error {
 		return err
 	}
 
-	// Ensure exclusion patterns is not nil
+	// Ensure slice fields are not nil
 	if config.Ingest.ExclusionPatterns == nil {
 		config.Ingest.ExclusionPatterns = []string{}
+	}
+	if config.Reclassify.InfoToErrorPatterns == nil {
+		config.Reclassify.InfoToErrorPatterns = DefaultInfoToErrorPatterns()
+	}
+	if config.Reclassify.ErrorToWarningPatterns == nil {
+		config.Reclassify.ErrorToWarningPatterns = DefaultErrorToWarningPatterns()
 	}
 
 	s.config = config

@@ -192,11 +192,21 @@ export function LogTable({
         const severity = getSeverityInfo(value as number);
         const badgeStyle = getSeverityBadgeStyle(value as number);
         return (
-          <span 
-            className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs uppercase font-medium"
-            style={badgeStyle}
-          >
-            {severity.name}
+          <span className="inline-flex items-center gap-1">
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs uppercase font-medium"
+              style={badgeStyle}
+            >
+              {severity.name}
+            </span>
+            {entry.reclassified && (
+              <span
+                title="Severity reclassified from original value"
+                className="text-kumo-inactive text-xs leading-none select-none"
+              >
+                ~
+              </span>
+            )}
           </span>
         );
       }
@@ -378,11 +388,21 @@ export function LogRow({ entry, columns }: { entry: LogEntry; columns: ColumnCon
 
   return (
     <div className="flex items-center gap-2 py-1 px-2 border-b border-kumo-line hover:bg-kumo-tint animate-fade-in">
-      <span
-        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs uppercase font-medium shrink-0"
-        style={badgeStyle}
-      >
-        {severity.name}
+      <span className="inline-flex items-center gap-1 shrink-0">
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs uppercase font-medium"
+          style={badgeStyle}
+        >
+          {severity.name}
+        </span>
+        {entry.reclassified && (
+          <span
+            title="Severity reclassified from original value"
+            className="text-kumo-inactive text-xs leading-none select-none"
+          >
+            ~
+          </span>
+        )}
       </span>
       <span className="text-xs text-kumo-subtle shrink-0 w-36">
         {formatTimestamp(entry.timestamp)}

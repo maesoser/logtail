@@ -658,14 +658,24 @@ export function LogDetailDrawer({
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line">
             <div className="flex items-center gap-3">
-              <span
-                className="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium uppercase"
-                style={{
-                  backgroundColor: severity.bgColor,
-                  color: severity.color,
-                }}
-              >
-                {severity.name}
+              <span className="inline-flex items-center gap-1">
+                <span
+                  className="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium uppercase"
+                  style={{
+                    backgroundColor: severity.bgColor,
+                    color: severity.color,
+                  }}
+                >
+                  {severity.name}
+                </span>
+                {entry.reclassified && (
+                  <span
+                    title="Severity reclassified from original value"
+                    className="text-kumo-inactive text-xs leading-none select-none"
+                  >
+                    ~
+                  </span>
+                )}
               </span>
               <div className="text-sm text-kumo-subtle">
                 <span className="font-medium text-kumo-default">{formatTimestamp(entry.timestamp)}</span>
