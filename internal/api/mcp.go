@@ -2,12 +2,16 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/logtail/logtail/internal/models"
 )
+
+// sessions is the process-wide SSE session registry.
+var sessions = newSessionManager()
 
 // MCP JSON-RPC 2.0 types
 
@@ -163,12 +167,88 @@ func mcpToolList() []mcpTool {
 	}
 }
 
-// HandleMCP handles MCP JSON-RPC 2.0 requests over HTTP POST.
-func (h *Handlers) HandleMCP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+// HandleMCPGet implements the GET /mcp endpoint for the Streamable HTTP
+// transport (MCP spec 2025-03-26). It upgrades the connection to an SSE
+// stream so the server can push messages to the client asynchronously.
+//
+// On success the response carries:
+//
+//	Content-Type: text/event-stream
+//	Mcp-Session-Id: <id>
+//
+// The stream stays open until the client disconnects or the session is
+// terminated via DELETE /mcp.
+func (h *Handlers) HandleMCPGet(w http.ResponseWriter, r *http.Request) {
+	// Only accept clients that explicitly want SSE.
+	accept := r.Header.Get("Accept")
+	if !strings.Contains(accept, "text/event-stream") {
+		http.Error(w, "Accept: text/event-stream required for GET /mcp", http.StatusNotAcceptable)
+		return
+	}
 
+	// Verify the underlying ResponseWriter supports flushing.
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported by server", http.StatusInternalServerError)
+		return
+	}
+
+	sess := sessions.create()
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Mcp-Session-Id", sess.id)
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			// Client disconnected.
+			sessions.remove(sess.id)
+			return
+		case <-sess.done:
+			// Session terminated (DELETE or reaper).
+			fmt.Fprintf(w, "event: close\ndata: {}\n\n")
+			flusher.Flush()
+			return
+		case payload, ok := <-sess.ch:
+			if !ok {
+				return
+			}
+			fmt.Fprintf(w, "event: message\ndata: %s\n\n", payload)
+			flusher.Flush()
+		}
+	}
+}
+
+// HandleMCPDelete implements DELETE /mcp to let a client explicitly close its
+// SSE session.
+func (h *Handlers) HandleMCPDelete(w http.ResponseWriter, r *http.Request) {
+	id := r.Header.Get("Mcp-Session-Id")
+	if id == "" {
+		http.Error(w, "Mcp-Session-Id header required", http.StatusBadRequest)
+		return
+	}
+	sessions.remove(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleMCP handles MCP JSON-RPC 2.0 requests over HTTP POST.
+//
+// If the request carries an Mcp-Session-Id header that maps to a live SSE
+// session, the JSON-RPC response is pushed through that SSE stream and the
+// HTTP response body is empty (202 Accepted). Notifications (id == nil) are
+// always sent via SSE when a session exists.
+//
+// Without a session the handler falls back to the original inline
+// request/response behaviour.
+func (h *Handlers) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	var req mcpRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		writeJSON(w, mcpResponse{
 			JSONRPC: "2.0",
 			Error:   &mcpError{Code: mcpParseError, Message: "Parse error: " + err.Error()},
@@ -177,6 +257,7 @@ func (h *Handlers) HandleMCP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.JSONRPC != "2.0" {
+		w.Header().Set("Content-Type", "application/json")
 		writeJSON(w, mcpResponse{
 			JSONRPC: "2.0",
 			ID:      req.ID,
@@ -185,6 +266,45 @@ func (h *Handlers) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve optional SSE session.
+	var sess *mcpSession
+	if id := r.Header.Get("Mcp-Session-Id"); id != "" {
+		sess = sessions.get(id)
+		// Unknown session ID — tell the client to re-establish.
+		if sess == nil {
+			http.Error(w, "session not found; open GET /mcp to create one", http.StatusNotFound)
+			return
+		}
+	}
+
+	resp := h.dispatch(req)
+
+	// Notifications (id == nil) have no response in JSON-RPC 2.0.
+	isNotification := req.ID == nil
+
+	if isNotification {
+		// Still acknowledge so the client knows we processed it.
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	if sess != nil {
+		// Route response through the SSE stream.
+		payload, err := json.Marshal(resp)
+		if err == nil {
+			sess.send(string(payload))
+		}
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	// Inline response (no session).
+	w.Header().Set("Content-Type", "application/json")
+	writeJSON(w, resp)
+}
+
+// dispatch builds the JSON-RPC response for a request.
+func (h *Handlers) dispatch(req mcpRequest) mcpResponse {
 	var result interface{}
 	var rpcErr *mcpError
 
@@ -202,8 +322,7 @@ func (h *Handlers) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "notifications/initialized":
-		// client acknowledgement — no response needed for notifications,
-		// but since we're HTTP (not SSE) we just return an empty result.
+		// Client acknowledgement — no result payload.
 		result = map[string]interface{}{}
 
 	case "tools/list":
@@ -216,12 +335,12 @@ func (h *Handlers) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		rpcErr = &mcpError{Code: mcpMethodNotFound, Message: "Method not found: " + req.Method}
 	}
 
-	writeJSON(w, mcpResponse{
+	return mcpResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  result,
 		Error:   rpcErr,
-	})
+	}
 }
 
 func (h *Handlers) handleToolCall(raw json.RawMessage) (interface{}, *mcpError) {

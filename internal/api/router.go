@@ -52,8 +52,13 @@ func NewRouter(buf *buffer.CircularBuffer, hub *websocket.Hub, webAssets embed.F
 		r.Put("/config", handlers.HandleUpdateConfig)
 	})
 
-	// MCP endpoint (JSON-RPC 2.0)
+	// MCP endpoints — Streamable HTTP transport (MCP spec 2025-03-26)
+	// GET  /mcp  → open SSE stream, returns Mcp-Session-Id header
+	// POST /mcp  → send JSON-RPC message (inline response or via SSE session)
+	// DELETE /mcp → terminate SSE session
+	r.Get("/mcp", handlers.HandleMCPGet)
 	r.Post("/mcp", handlers.HandleMCP)
+	r.Delete("/mcp", handlers.HandleMCPDelete)
 
 	// Ingest endpoint
 	r.Post("/ingest", handlers.HandleIngest)
