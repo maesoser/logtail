@@ -150,7 +150,11 @@ func (b *CircularBuffer) Stop() {
 func (b *CircularBuffer) Add(entry models.LogEntry) models.LogEntry {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	return b.addLocked(entry)
+}
 
+// addLocked inserts a single entry into the buffer. Must be called with b.mu held.
+func (b *CircularBuffer) addLocked(entry models.LogEntry) models.LogEntry {
 	// Assign a unique ID
 	entry.ID = atomic.AddUint64(&b.idSeq, 1)
 
@@ -315,11 +319,13 @@ func (b *CircularBuffer) insertAt(pos int, entry models.LogEntry, entrySize int)
 	b.currentSize += int64(entrySize)
 }
 
-// AddBatch adds multiple log entries to the buffer
+// AddBatch adds multiple log entries to the buffer under a single lock acquisition.
 func (b *CircularBuffer) AddBatch(entries []models.LogEntry) []models.LogEntry {
 	result := make([]models.LogEntry, len(entries))
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	for i, entry := range entries {
-		result[i] = b.Add(entry)
+		result[i] = b.addLocked(entry)
 	}
 	return result
 }

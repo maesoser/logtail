@@ -932,7 +932,7 @@ function MetadataItem({
   onFilter?: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between group">
       <div>
         <span className="text-kumo-subtle">{label}:</span>
         <span className="ml-2 font-medium text-kumo-default">

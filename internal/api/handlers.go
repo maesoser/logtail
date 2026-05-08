@@ -195,6 +195,16 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 		errors = append(errors, "Scanner error: "+err.Error())
 	}
 
+	// Broadcast updated stats and top-stats to all connected WebSocket clients.
+	// Done once per ingest request (not per entry) since both calls do a full
+	// buffer scan. Runs in a goroutine so it doesn't delay the HTTP response.
+	if ingested > 0 && h.Hub.ClientCount() > 0 {
+		go func() {
+			h.Hub.BroadcastStats(h.Buffer.GetStats(nil, models.HistogramConfig24h))
+			h.Hub.BroadcastTopStats(h.Buffer.GetTopStats(nil, 10))
+		}()
+	}
+
 	response := IngestResponseExtended{
 		Ingested: ingested,
 		Excluded: excluded,
