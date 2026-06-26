@@ -5,11 +5,14 @@ import {
   ArrowClockwiseIcon,
   SunIcon,
   MoonIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  ChartLineUpIcon,
 } from '@phosphor-icons/react';
 import { useLogs, useWebSocket } from './hooks/useLogs';
 import { useStats, useUniqueValues } from './hooks/useStats';
 import { useTopStats } from './hooks/useTopStats';
+import { useHealth } from './hooks/useHealth';
+import { useHostnameStats } from './hooks/useHostnameStats';
 import { useDarkMode } from './hooks/useDarkMode';
 import { usePersistedColumns } from './hooks/usePersistedColumns';
 import { useIsMobile } from './hooks/useMediaQuery';
@@ -21,6 +24,7 @@ import { LogTable } from './components/LogTable';
 import { LogDetailDrawer } from './components/LogDetailDrawer';
 import { StatsSidebar } from './components/StatsSidebar';
 import { Settings } from './components/Settings';
+import { InsightsPanel } from './components/InsightsPanel';
 import type { LogFilter, LogEntry } from './types';
 
 function App() {
@@ -48,12 +52,27 @@ function App() {
   
   // Stats sidebar state
   const [statsSidebarOpen, setStatsSidebarOpen] = useState(false);
+
+  // Insights panel state
+  const [insightsPanelOpen, setInsightsPanelOpen] = useState(false);
   
   // Fetch data
   const { data: logsData, loading: logsLoading, refetch: refetchLogs } = useLogs(filter);
   const { stats, refetch: refetchStats } = useStats(10000, filter, timeRange);
   const { data: topStats, loading: topStatsLoading, refetch: refetchTopStats, triggerRefetch: triggerTopStatsRefetch } = useTopStats(filter, timeRange);
   
+  // Health data (for insights panel)
+  const { data: health, loading: healthLoading } = useHealth(10000);
+
+  // Top-10 hostname list derived from topStats (already fetched, no extra call)
+  const top10Hostnames = useMemo(
+    () => (topStats?.hostnames ?? []).slice(0, 10).map(h => h.value),
+    [topStats]
+  );
+
+  // Per-hostname histogram stats (for insights panel)
+  const { statsByHostname, loading: hostnameStatsLoading } = useHostnameStats(top10Hostnames, timeRange);
+
   // Fetch unique values for filter dropdowns
   const { values: uniqueClients } = useUniqueValues('client');
   const { values: uniqueHostnames } = useUniqueValues('hostname');
@@ -179,6 +198,16 @@ function App() {
                 {!isMobile && 'Refresh'}
               </Button>
               
+              {/* Insights panel toggle */}
+              <Button
+                variant={insightsPanelOpen ? 'primary' : 'outline'}
+                onClick={() => setInsightsPanelOpen(!insightsPanelOpen)}
+                shape="square"
+                aria-label={insightsPanelOpen ? 'Close insights' : 'Open insights'}
+              >
+                <ChartLineUpIcon size={16} />
+              </Button>
+
               {/* Stats sidebar toggle */}
               <Button
                 variant={statsSidebarOpen ? 'primary' : 'outline'}
@@ -288,6 +317,21 @@ function App() {
         canNavigateNext={canNavigateNext}
         searchTerm={filter.content}
       />
+
+      {/* Insights Panel */}
+      {insightsPanelOpen && (
+        <InsightsPanel
+          health={health}
+          healthLoading={healthLoading}
+          topStats={topStats}
+          statsByHostname={statsByHostname}
+          hostnameStatsLoading={hostnameStatsLoading}
+          timeRange={timeRange}
+          onTimeRangeChange={setTimeRange}
+          onClose={() => setInsightsPanelOpen(false)}
+          onFilterBy={handleQuickFilter}
+        />
+      )}
     </div>
   );
 }
