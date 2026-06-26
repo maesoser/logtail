@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { LogEntry, LogFilter, LogQueryResult, TopStats } from '../types';
+import type { LogEntry, LogFilter, LogQueryResult } from '../types';
 
 const API_BASE = '';
 
@@ -55,7 +55,7 @@ export function useLogs(filter: LogFilter) {
 
 interface WebSocketCallbacks {
   onLogEntry: (entry: LogEntry) => void;
-  onTopStats?: (topStats: TopStats) => void;
+  onTopStats?: () => void;
 }
 
 export function useWebSocket({ onLogEntry, onTopStats }: WebSocketCallbacks) {
@@ -99,7 +99,7 @@ export function useWebSocket({ onLogEntry, onTopStats }: WebSocketCallbacks) {
             if (message.type === 'log_entry') {
               onLogEntryRef.current(message.payload as LogEntry);
             } else if (message.type === 'top_stats' && onTopStatsRef.current) {
-              onTopStatsRef.current(message.payload as TopStats);
+              onTopStatsRef.current();
             }
           }
         } catch (err) {

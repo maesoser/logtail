@@ -21,7 +21,7 @@ import { LogTable } from './components/LogTable';
 import { LogDetailDrawer } from './components/LogDetailDrawer';
 import { StatsSidebar } from './components/StatsSidebar';
 import { Settings } from './components/Settings';
-import type { LogFilter, LogEntry, TopStats } from './types';
+import type { LogFilter, LogEntry } from './types';
 
 function App() {
   // Dark mode
@@ -52,7 +52,7 @@ function App() {
   // Fetch data
   const { data: logsData, loading: logsLoading, refetch: refetchLogs } = useLogs(filter);
   const { stats, refetch: refetchStats } = useStats(10000, filter, timeRange);
-  const { data: topStats, loading: topStatsLoading, refetch: refetchTopStats, updateFromWebSocket: updateTopStats } = useTopStats(filter, timeRange);
+  const { data: topStats, loading: topStatsLoading, refetch: refetchTopStats, triggerRefetch: triggerTopStatsRefetch } = useTopStats(filter, timeRange);
   
   // Fetch unique values for filter dropdowns
   const { values: uniqueClients } = useUniqueValues('client');
@@ -67,10 +67,11 @@ function App() {
     });
   }, []);
   
-  // Handle top stats updates from WebSocket
-  const handleTopStatsUpdate = useCallback((topStats: TopStats) => {
-    updateTopStats(topStats);
-  }, [updateTopStats]);
+  // Handle top stats updates from WebSocket: re-fetch with the active filters
+  // rather than applying the server-pushed unfiltered payload directly.
+  const handleTopStatsUpdate = useCallback(() => {
+    triggerTopStatsRefetch();
+  }, [triggerTopStatsRefetch]);
   
   // WebSocket connection
   const { connected } = useWebSocket({ 
@@ -243,7 +244,6 @@ function App() {
             columns={columns}
             loading={logsLoading}
             page={filter.page || 1}
-            totalPages={logsData?.totalPages || 1}
             totalCount={logsData?.totalCount || 0}
             limit={filter.limit || 50}
             onPageChange={handlePageChange}

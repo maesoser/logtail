@@ -62,16 +62,18 @@ export function useTopStats(filter?: LogFilter, timeRange: TimeRange = '24h', li
     } finally {
       setLoading(false);
     }
-  }, [filterKey, limit, timeRange]);
+  }, [filterKey]);
 
   useEffect(() => {
     fetchTopStats();
   }, [fetchTopStats]);
 
-  // Update data from WebSocket
-  const updateFromWebSocket = useCallback((topStats: TopStats) => {
-    setData(topStats);
-  }, []);
+  // Trigger a fresh filtered fetch when the WebSocket signals new data arrived.
+  // This avoids blindly applying the server-pushed (unfiltered) top_stats payload,
+  // which would reset the sidebar whenever a log arrives while filters are active.
+  const triggerRefetch = useCallback(() => {
+    fetchTopStats();
+  }, [fetchTopStats]);
 
-  return { data, loading, error, refetch: fetchTopStats, updateFromWebSocket };
+  return { data, loading, error, refetch: fetchTopStats, triggerRefetch };
 }
