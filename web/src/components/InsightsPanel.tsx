@@ -144,6 +144,11 @@ function HostnameCard({ hostname, stats, timeRange, onTimeRangeChange, onFilterB
     onClose();
   };
 
+  // Sum histogram bucket counts — this reflects logs for this specific hostname
+  // in the selected time range. stats.totalEntries is the global buffer count
+  // (unfiltered) and must not be used here.
+  const hostnameLogCount = stats.histogram.reduce((sum, b) => sum + b.count, 0);
+
   return (
     <LayerCard>
       <LayerCard.Secondary className="flex items-center justify-between">
@@ -159,7 +164,7 @@ function HostnameCard({ hostname, stats, timeRange, onTimeRangeChange, onFilterB
           />
         </button>
         <span className="text-xs text-kumo-subtle">
-          {stats.totalEntries.toLocaleString()} logs
+          {hostnameLogCount.toLocaleString()} logs
         </span>
       </LayerCard.Secondary>
       <LayerCard.Primary className="p-3">
@@ -169,6 +174,7 @@ function HostnameCard({ hostname, stats, timeRange, onTimeRangeChange, onFilterB
             bucketMinutes={stats.bucketMinutes}
             timeRange={timeRange}
             onTimeRangeChange={onTimeRangeChange}
+            hideControls
             height={80}
           />
         ) : (
