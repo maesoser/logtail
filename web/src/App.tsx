@@ -323,6 +323,7 @@ function App() {
         <InsightsPanel
           health={health}
           healthLoading={healthLoading}
+          globalStats={stats}
           topStats={topStats}
           statsByHostname={statsByHostname}
           hostnameStatsLoading={hostnameStatsLoading}

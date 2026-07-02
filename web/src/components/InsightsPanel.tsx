@@ -10,7 +10,7 @@ import {
   ClockIcon,
   ChartBarIcon,
 } from '@phosphor-icons/react';
-import type { HealthData, LatencyStats, TopStats, Stats, LogFilter, TimeRange } from '../types';
+import type { HealthData, LatencyStats, TopStats, Stats, HistogramBucket, LogFilter, TimeRange } from '../types';
 import { VALID_TIME_RANGES, TIME_RANGE_CONFIGS } from '../types';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -312,11 +312,138 @@ function HostnameHistogram({
   );
 }
 
+// ─── throughput chart ────────────────────────────────────────────────────────
+
+const THROUGHPUT_COLOR = '#6366f1'; // indigo — distinct from severity palette
+
+interface ThroughputChartProps {
+  histogram: HistogramBucket[];
+  bucketMinutes: number;
+  height?: number;
+}
+
+function ThroughputChart({ histogram, bucketMinutes, height = 100 }: ThroughputChartProps) {
+  const { bars, maxRate, avgRate, peakRate, timeLabels } = useMemo(() => {
+    const rates = histogram.map(b => b.count / bucketMinutes); // logs/min per bucket
+    const max = Math.max(...rates, 1);
+    const nonZero = rates.filter(r => r > 0);
+    const avg = nonZero.length > 0
+      ? nonZero.reduce((s, r) => s + r, 0) / nonZero.length
+      : 0;
+    const peak = Math.max(...rates, 0);
+
+    const barsData = histogram.map((b, i) => ({
+      hour: b.hour,
+      count: b.count,
+      rate: rates[i],
+      index: i,
+    }));
+
+    const n = histogram.length;
+    const labels = [0, 1, 2, 3, 4].map(
+      q => histogram[Math.floor(q * (n - 1) / 4)]?.hour ?? ''
+    );
+
+    return { bars: barsData, maxRate: max, avgRate: avg, peakRate: peak, timeLabels: labels };
+  }, [histogram, bucketMinutes]);
+
+  const availableHeight = height - 8;
+
+  return (
+    <div>
+      {/* Summary stat tiles */}
+      <div className="grid grid-cols-3 gap-4 mb-4 pb-4 border-b border-kumo-line">
+        <StatTile
+          label="avg rate"
+          value={`${avgRate.toFixed(1)}`}
+          sub="logs / min"
+        />
+        <StatTile
+          label="peak rate"
+          value={`${peakRate.toFixed(1)}`}
+          sub="logs / min"
+        />
+        <StatTile
+          label="last bucket"
+          value={`${bars[bars.length - 1]?.rate.toFixed(1) ?? '—'}`}
+          sub={`logs / min (${bucketMinutes}min bucket)`}
+        />
+      </div>
+
+      {/* Bars */}
+      <div
+        className="relative bg-kumo-base rounded flex items-end gap-[2px]"
+        style={{ height: `${height}px` }}
+      >
+        {bars.map((bar) => {
+          const barHeight = Math.max((bar.rate / maxRate) * availableHeight, bar.count > 0 ? 1 : 0);
+          return (
+            <Popover.Root key={bar.index}>
+              <Popover.Trigger
+                openOnHover
+                delay={100}
+                className="flex-1 flex flex-col justify-end min-w-0 hover:opacity-70 transition-opacity cursor-default"
+                style={{ height: `${availableHeight}px` }}
+              >
+                <div
+                  className="w-full"
+                  style={{
+                    height: `${barHeight}px`,
+                    backgroundColor: THROUGHPUT_COLOR,
+                    borderTopLeftRadius: 2,
+                    borderTopRightRadius: 2,
+                  }}
+                />
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Positioner side="bottom" align="center" collisionPadding={8} sideOffset={8}>
+                  <Popover.Popup className="min-w-[160px] flex flex-col rounded-lg bg-kumo-elevated px-4 py-3 text-sm shadow-lg border border-kumo-line">
+                    <Popover.Title className="text-sm font-medium text-kumo-default">
+                      {bar.hour}
+                    </Popover.Title>
+                    <Popover.Description className="text-sm text-kumo-strong">
+                      <span className="font-medium">{bar.rate.toFixed(1)}</span> logs/min
+                    </Popover.Description>
+                    <div className="mt-1 text-xs text-kumo-subtle">
+                      {bar.count.toLocaleString()} logs in {bucketMinutes}min
+                    </div>
+                  </Popover.Popup>
+                </Popover.Positioner>
+              </Popover.Portal>
+            </Popover.Root>
+          );
+        })}
+      </div>
+
+      {/* Time labels */}
+      <div className="flex justify-between px-1 text-xs text-kumo-subtle mt-1">
+        {timeLabels.map((label, i) => (
+          <span key={i}>{label}</span>
+        ))}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center gap-1.5 text-xs">
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: THROUGHPUT_COLOR }} />
+          <span className="text-kumo-subtle">logs / min</span>
+        </div>
+        <div className="text-xs text-kumo-subtle">
+          <span>{bucketMinutes}min buckets</span>
+          <span className="mx-2">·</span>
+          <span>peak {peakRate.toFixed(1)} logs/min</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── main panel ──────────────────────────────────────────────────────────────
 
 interface InsightsPanelProps {
   health: HealthData | null;
   healthLoading: boolean;
+  globalStats: Stats | null;
   topStats: TopStats | null;
   statsByHostname: Record<string, Stats>;
   hostnameStatsLoading: boolean;
@@ -329,6 +456,7 @@ interface InsightsPanelProps {
 export function InsightsPanel({
   health,
   healthLoading,
+  globalStats,
   topStats,
   statsByHostname,
   hostnameStatsLoading,
@@ -342,11 +470,17 @@ export function InsightsPanel({
   return (
     <div className="fixed inset-0 z-20 bg-kumo-base overflow-y-auto">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-kumo-base border-b border-kumo-line px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-10 bg-kumo-base border-b border-kumo-line px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 md:gap-3">
           <ChartBarIcon size={20} className="text-kumo-brand" />
           <h2 className="text-lg md:text-xl font-medium text-kumo-default">Insights</h2>
         </div>
+        <Tabs
+          variant="segmented"
+          tabs={TIME_RANGE_TABS}
+          value={timeRange}
+          onValueChange={(v) => onTimeRangeChange(v as TimeRange)}
+        />
         <Button
           variant="outline"
           shape="square"
@@ -392,24 +526,34 @@ export function InsightsPanel({
           )}
         </section>
 
+        {/* ── Ingestion Throughput ──────────────────────────── */}
+        {globalStats && globalStats.histogram.length > 0 && (
+          <section className="space-y-4">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-kumo-subtle">
+              Ingestion Throughput
+            </h3>
+            <LayerCard>
+              <LayerCard.Primary className="p-4">
+                <ThroughputChart
+                  histogram={globalStats.histogram}
+                  bucketMinutes={globalStats.bucketMinutes}
+                  height={100}
+                />
+              </LayerCard.Primary>
+            </LayerCard>
+          </section>
+        )}
+
         {/* ── Activity by Hostname ──────────────────────────── */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-kumo-subtle">
-              Activity by Hostname
-              {hostnames.length > 0 && (
-                <span className="ml-2 normal-case font-normal text-kumo-inactive">
-                  (top {hostnames.length})
-                </span>
-              )}
-            </h3>
-            <Tabs
-              variant="segmented"
-              tabs={TIME_RANGE_TABS}
-              value={timeRange}
-              onValueChange={(v) => onTimeRangeChange(v as TimeRange)}
-            />
-          </div>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-kumo-subtle">
+            Activity by Hostname
+            {hostnames.length > 0 && (
+              <span className="ml-2 normal-case font-normal text-kumo-inactive">
+                (top {hostnames.length})
+              </span>
+            )}
+          </h3>
 
           {hostnames.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-kumo-subtle gap-2">
