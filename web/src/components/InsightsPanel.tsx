@@ -9,6 +9,9 @@ import {
   WifiHighIcon,
   ClockIcon,
   ChartBarIcon,
+  RobotIcon,
+  WarningIcon,
+  CopyIcon,
 } from '@phosphor-icons/react';
 import type { HealthData, LatencyStats, TopStats, Stats, HistogramBucket, LogFilter, TimeRange } from '../types';
 import { VALID_TIME_RANGES, TIME_RANGE_CONFIGS } from '../types';
@@ -20,6 +23,18 @@ function formatBytes(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+}
+
+function formatRetention(oldest: string | null, newest: string | null): string | null {
+  if (!oldest || !newest) return null;
+  const diffMs = new Date(newest).getTime() - new Date(oldest).getTime();
+  if (diffMs <= 0) return null;
+  const diffMins = diffMs / 60000;
+  if (diffMins < 60) return `${Math.round(diffMins)} min stored`;
+  const diffHours = diffMins / 60;
+  if (diffHours < 24) return `${Math.round(diffHours)} hr stored`;
+  const diffDays = diffHours / 24;
+  return `${diffDays.toFixed(1)} days stored`;
 }
 
 // ─── sub-components ─────────────────────────────────────────────────────────
@@ -67,9 +82,10 @@ function LatencyCard({ title, icon, stats }: LatencyCardProps) {
 
 interface BufferCardProps {
   health: HealthData;
+  retentionLabel: string | null;
 }
 
-function BufferCard({ health }: BufferCardProps) {
+function BufferCard({ health, retentionLabel }: BufferCardProps) {
   const usedPct = health.bufferSizeBytes > 0
     ? Math.round((health.bufferUsedBytes / health.bufferSizeBytes) * 100)
     : 0;
@@ -115,6 +131,11 @@ function BufferCard({ health }: BufferCardProps) {
             value={health.wsClients}
             sub={health.wsClients === 1 ? '1 viewer' : `${health.wsClients} viewers`}
           />
+          {retentionLabel && (
+            <div className="col-span-2">
+              <StatTile label="retention" value={retentionLabel} />
+            </div>
+          )}
         </div>
       </LayerCard.Primary>
     </LayerCard>
@@ -466,6 +487,10 @@ export function InsightsPanel({
   onFilterBy,
 }: InsightsPanelProps) {
   const hostnames = topStats?.hostnames.slice(0, 10).map(h => h.value) ?? [];
+  const retentionLabel = useMemo(
+    () => formatRetention(globalStats?.oldestTimestamp ?? null, globalStats?.newestTimestamp ?? null),
+    [globalStats?.oldestTimestamp, globalStats?.newestTimestamp]
+  );
 
   return (
     <div className="fixed inset-0 z-20 bg-kumo-base overflow-y-auto">
@@ -506,7 +531,7 @@ export function InsightsPanel({
             </div>
           ) : health ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <BufferCard health={health} />
+              <BufferCard health={health} retentionLabel={retentionLabel} />
               <LatencyCard
                 title="Ingest Latency"
                 icon={<ArrowsClockwiseIcon size={14} />}
@@ -579,6 +604,70 @@ export function InsightsPanel({
               </LayerCard.Primary>
             </LayerCard>
           )}
+        </section>
+
+        {/* ── MCP Server ───────────────────────────────────── */}
+        <section className="space-y-4">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-kumo-subtle">
+            Integrations
+          </h3>
+          <LayerCard>
+            <LayerCard.Primary className="p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-kumo-brand mt-0.5 flex-shrink-0">
+                  <RobotIcon size={20} />
+                </span>
+                <div className="flex-1 min-w-0 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-kumo-default">MCP Server available</p>
+                    <p className="text-xs text-kumo-subtle mt-0.5">
+                      Connect any MCP-compatible AI client to query logs and stats programmatically.
+                      Uses Streamable HTTP transport (protocol 2025-03-26).
+                    </p>
+                  </div>
+
+                  {/* Endpoint */}
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-xs bg-kumo-fill rounded px-3 py-1.5 font-mono text-kumo-default truncate">
+                      {typeof window !== 'undefined' ? window.location.origin : ''}/mcp
+                    </code>
+                    <button
+                      onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/mcp`)}
+                      className="flex-shrink-0 text-kumo-subtle hover:text-kumo-default transition-colors"
+                      aria-label="Copy MCP endpoint URL"
+                      title="Copy to clipboard"
+                    >
+                      <CopyIcon size={14} />
+                    </button>
+                  </div>
+
+                  {/* Tools */}
+                  <div className="space-y-1">
+                    <p className="text-xs text-kumo-subtle font-medium uppercase tracking-wide">Available tools</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['query_logs', 'get_stats'].map(tool => (
+                        <span
+                          key={tool}
+                          className="text-xs font-mono bg-kumo-fill rounded px-2 py-0.5 text-kumo-default"
+                        >
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Auth warning */}
+                  <div className="flex items-start gap-1.5 text-xs text-kumo-subtle border-t border-kumo-line pt-3">
+                    <WarningIcon size={13} className="flex-shrink-0 mt-0.5 text-kumo-subtle" />
+                    <span>
+                      No authentication is required on this endpoint. Restrict network access
+                      if running in a shared or public environment.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </LayerCard.Primary>
+          </LayerCard>
         </section>
 
       </div>
