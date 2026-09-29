@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/logtail/logtail/internal/buffer"
@@ -20,23 +19,35 @@ import (
 	"github.com/logtail/logtail/internal/websocket"
 )
 
-// LatencyMetrics tracks latency statistics for different operations
+const scannerBufSize = 1024 * 1024 // 1 MB
+
+// scannerBufPool pools the 1 MB byte slices used as bufio.Scanner backing buffers.
+// Reusing them across ingest requests avoids a large allocation on every POST /ingest.
+var scannerBufPool = sync.Pool{
+	New: func() interface{} {
+		b := make([]byte, scannerBufSize)
+		return &b
+	},
+}
+
+// LatencyMetrics tracks latency statistics for different operations.
+// All fields are protected by a single mutex so Record and Get always
+// produce a consistent, race-free snapshot.
 type LatencyMetrics struct {
-	mu      sync.RWMutex
+	mu      sync.Mutex
 	count   int64
 	totalMs int64
 	minMs   int64
 	maxMs   int64
 }
 
-// Record records a latency measurement in milliseconds
+// Record records a latency measurement in milliseconds.
 func (m *LatencyMetrics) Record(duration time.Duration) {
 	ms := duration.Milliseconds()
-	atomic.AddInt64(&m.count, 1)
-	atomic.AddInt64(&m.totalMs, ms)
-
 	m.mu.Lock()
-	if m.minMs == 0 || ms < m.minMs {
+	m.count++
+	m.totalMs += ms
+	if m.count == 1 || ms < m.minMs {
 		m.minMs = ms
 	}
 	if ms > m.maxMs {
@@ -45,15 +56,14 @@ func (m *LatencyMetrics) Record(duration time.Duration) {
 	m.mu.Unlock()
 }
 
-// Get returns the current latency statistics
+// Get returns a consistent snapshot of the current latency statistics.
 func (m *LatencyMetrics) Get() map[string]int64 {
-	m.mu.RLock()
+	m.mu.Lock()
+	count := m.count
+	totalMs := m.totalMs
 	minMs := m.minMs
 	maxMs := m.maxMs
-	m.mu.RUnlock()
-
-	count := atomic.LoadInt64(&m.count)
-	totalMs := atomic.LoadInt64(&m.totalMs)
+	m.mu.Unlock()
 
 	var avgMs int64
 	if count > 0 {
@@ -149,9 +159,12 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 		reader = gzReader
 	}
 
-	// Parse JSONL (JSON Lines)
+	// Parse JSONL (JSON Lines).
+	// Borrow a pooled 1 MB buffer to avoid a large heap allocation per request.
+	scanBufPtr := scannerBufPool.Get().(*[]byte)
+	defer scannerBufPool.Put(scanBufPtr)
 	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1MB buffer
+	scanner.Buffer(*scanBufPtr, scannerBufSize)
 
 	var ingested int
 	var excluded int
@@ -177,16 +190,20 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// Lower-case content once and use it for both exclusion and reclassification
+		// to avoid allocating two separate lowercase copies per entry.
+		contentLower := strings.ToLower(entry.Content)
+
 		// Check exclusion patterns
-		if shouldExclude(entry.Content, exclusionPatterns) {
+		if shouldExcludeLower(contentLower, exclusionPatterns) {
 			excluded++
 			continue
 		}
 
 		// Optionally reclassify severity based on content patterns
-		applyReclassification(entry, reclassifyConfig)
+		applyReclassificationLower(entry, contentLower, reclassifyConfig)
 
-		h.Buffer.Add(*entry)
+		h.Buffer.Add(*entry) // Add takes by value; entry is pointer from ToLogEntry
 		ingested++
 	}
 
@@ -198,6 +215,8 @@ func (h *Handlers) HandleIngest(w http.ResponseWriter, r *http.Request) {
 	// Broadcast updated stats and top-stats to all connected WebSocket clients.
 	// Done once per ingest request (not per entry) since both calls do a full
 	// buffer scan. Runs in a goroutine so it doesn't delay the HTTP response.
+	// BroadcastStats/BroadcastTopStats use non-blocking sends internally, so
+	// this goroutine will not leak even if the hub's channel is momentarily full.
 	if ingested > 0 && h.Hub.ClientCount() > 0 {
 		go func() {
 			h.Hub.BroadcastStats(h.Buffer.GetStats(nil, models.HistogramConfig24h))
@@ -276,13 +295,36 @@ func parseRangeParam(rangeStr string) (*time.Time, error) {
 	return &from, nil
 }
 
-// shouldExclude checks if content contains any of the exclusion patterns
+// shouldExclude checks if content contains any of the exclusion patterns.
+func shouldExclude(content string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+	return shouldExcludeLower(strings.ToLower(content), patterns)
+}
+
+// shouldExcludeLower is like shouldExclude but accepts a pre-lowercased content
+// string to avoid a redundant allocation when the caller already has one.
+func shouldExcludeLower(contentLower string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if pattern != "" && strings.Contains(contentLower, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+	return false
+}
+
 // applyReclassification checks whether the log entry's severity should be overridden
 // based on content pattern matches and the active reclassify configuration.
 // It mutates the entry in place and sets Reclassified=true if a change was made.
 func applyReclassification(entry *models.LogEntry, cfg models.ReclassifyConfig) {
-	contentLower := strings.ToLower(entry.Content)
+	applyReclassificationLower(entry, strings.ToLower(entry.Content), cfg)
+}
 
+// applyReclassificationLower is like applyReclassification but accepts a
+// pre-lowercased content string to avoid a redundant allocation when the caller
+// already has one.
+func applyReclassificationLower(entry *models.LogEntry, contentLower string, cfg models.ReclassifyConfig) {
 	// INFO (6) → ERROR (3) when content matches an error pattern
 	if cfg.InfoToError && entry.Severity == int(models.SeverityInfo) {
 		for _, pattern := range cfg.InfoToErrorPatterns {
@@ -304,19 +346,6 @@ func applyReclassification(entry *models.LogEntry, cfg models.ReclassifyConfig) 
 			}
 		}
 	}
-}
-
-func shouldExclude(content string, patterns []string) bool {
-	if len(patterns) == 0 {
-		return false
-	}
-	contentLower := strings.ToLower(content)
-	for _, pattern := range patterns {
-		if pattern != "" && strings.Contains(contentLower, strings.ToLower(pattern)) {
-			return true
-		}
-	}
-	return false
 }
 
 // filterEmptyStrings returns a slice with empty strings removed
@@ -547,9 +576,8 @@ func (h *Handlers) HandleHealth(w http.ResponseWriter, r *http.Request) {
 
 // SetupWebSocketBroadcast configures the buffer to broadcast new entries via WebSocket
 func (h *Handlers) SetupWebSocketBroadcast() {
-	h.Buffer.SetOnChange(func(entry models.LogEntry) {
+	h.Buffer.SetOnChange(func(entry *models.LogEntry) {
 		h.Hub.BroadcastLogEntry(entry)
-		//log.Printf("Broadcasted log entry ID=%d to %d clients", entry.ID, h.Hub.ClientCount())
 	})
 }
 

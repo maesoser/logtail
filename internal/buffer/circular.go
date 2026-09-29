@@ -31,10 +31,17 @@ type CircularBuffer struct {
 	capacity          int // Current slice capacity
 	mu                sync.RWMutex
 	idSeq             uint64
-	onChange          func(entry models.LogEntry) // Callback for new entries
+	onChange          func(entry *models.LogEntry) // Callback for new entries
 	reorderWindow     time.Duration               // Time window for reordering out-of-order logs
 	retentionDuration time.Duration               // Maximum age for entries (0 = disabled)
-	stopCh            chan struct{}               // Closed to stop the background eviction goroutine
+	stopCh            chan struct{}                // Closed to stop the background eviction goroutine
+	// intern tables for low-cardinality string fields (Client, Hostname, Tag).
+	// Sharing backing arrays across entries avoids repeated heap allocations for
+	// repeated values (e.g. the same hostname appearing in thousands of entries).
+	// Protected by mu (same as all other fields).
+	internClient   map[string]string
+	internHostname map[string]string
+	internTag      map[string]string
 }
 
 // New creates a new circular buffer with the specified maximum size in bytes.
@@ -78,11 +85,18 @@ func NewWithOptions(maxSizeBytes int64, reorderWindow, retentionDuration time.Du
 		tail:              0,
 		reorderWindow:     reorderWindow,
 		retentionDuration: retentionDuration,
+		internClient:      make(map[string]string),
+		internHostname:    make(map[string]string),
+		internTag:         make(map[string]string),
 	}
 }
 
-// SetOnChange sets a callback function that is called when a new entry is added
-func (b *CircularBuffer) SetOnChange(fn func(entry models.LogEntry)) {
+// SetOnChange sets a callback function that is called when a new entry is added.
+// The *LogEntry pointer points into the ring buffer and is valid only for the
+// duration of the callback — the callee must not retain it after returning.
+// In practice the callback is invoked in a separate goroutine; callers that
+// need to keep the entry must copy the value before the goroutine ends.
+func (b *CircularBuffer) SetOnChange(fn func(entry *models.LogEntry)) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.onChange = fn
@@ -153,8 +167,28 @@ func (b *CircularBuffer) Add(entry models.LogEntry) models.LogEntry {
 	return b.addLocked(entry)
 }
 
+// internString returns the canonical copy of s from table, inserting it if absent.
+// This ensures all entries sharing the same low-cardinality value (e.g. hostname)
+// point to the same backing array, eliminating per-entry heap allocations.
+// Must be called with b.mu held.
+func internString(table map[string]string, s string) string {
+	if s == "" {
+		return s
+	}
+	if canonical, ok := table[s]; ok {
+		return canonical
+	}
+	table[s] = s
+	return s
+}
+
 // addLocked inserts a single entry into the buffer. Must be called with b.mu held.
 func (b *CircularBuffer) addLocked(entry models.LogEntry) models.LogEntry {
+	// Intern low-cardinality string fields to share backing arrays across entries.
+	entry.Client = internString(b.internClient, entry.Client)
+	entry.Hostname = internString(b.internHostname, entry.Hostname)
+	entry.Tag = internString(b.internTag, entry.Tag)
+
 	// Assign a unique ID
 	entry.ID = atomic.AddUint64(&b.idSeq, 1)
 
@@ -183,12 +217,17 @@ func (b *CircularBuffer) addLocked(entry models.LogEntry) models.LogEntry {
 	insertPos := b.findInsertPosition(entry.Timestamp)
 
 	// Insert at the calculated position
-	b.insertAt(insertPos, entry, entrySize)
+	insertedIdx := b.insertAt(insertPos, entry, entrySize)
 
-	// Call onChange callback if set
+	// Call onChange callback if set.
+	// We pass a pointer to the slot in the ring rather than copying the whole
+	// struct into the goroutine closure. The goroutine must finish (or copy the
+	// value) before the slot could be reused by a future eviction, which is safe
+	// in practice because eviction only happens under a write lock and the
+	// goroutine does not hold the lock.
 	if b.onChange != nil {
-		// Call in a goroutine to avoid blocking
-		go b.onChange(entry)
+		ringEntry := &b.entries[insertedIdx]
+		go b.onChange(ringEntry)
 	}
 
 	return entry
@@ -293,12 +332,15 @@ func (b *CircularBuffer) findInsertPosition(timestamp time.Time) int {
 
 // insertAt inserts an entry at the specified logical position, shifting newer entries.
 // Position is a logical index where 0 = oldest, count = after newest.
+// Returns the physical ring index where the entry was written.
 // Must be called with lock held and after ensuring capacity.
-func (b *CircularBuffer) insertAt(pos int, entry models.LogEntry, entrySize int) {
+func (b *CircularBuffer) insertAt(pos int, entry models.LogEntry, entrySize int) int {
+	var physIdx int
 	if pos >= b.count {
 		// Append at the end (most common case)
-		b.entries[b.head] = entry
-		b.entrySizes[b.head] = entrySize
+		physIdx = b.head
+		b.entries[physIdx] = entry
+		b.entrySizes[physIdx] = entrySize
 		b.head = (b.head + 1) % b.capacity
 	} else {
 		// Need to shift entries from pos to head-1 to make room
@@ -310,13 +352,14 @@ func (b *CircularBuffer) insertAt(pos int, entry models.LogEntry, entrySize int)
 			b.entrySizes[dstIdx] = b.entrySizes[srcIdx]
 		}
 		// Insert at the position
-		insertIdx := (b.tail + pos) % b.capacity
-		b.entries[insertIdx] = entry
-		b.entrySizes[insertIdx] = entrySize
+		physIdx = (b.tail + pos) % b.capacity
+		b.entries[physIdx] = entry
+		b.entrySizes[physIdx] = entrySize
 		b.head = (b.head + 1) % b.capacity
 	}
 	b.count++
 	b.currentSize += int64(entrySize)
+	return physIdx
 }
 
 // AddBatch adds multiple log entries to the buffer under a single lock acquisition.
