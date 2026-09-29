@@ -47,12 +47,15 @@ func main() {
 	buf := buffer.NewWithOptions(cfg.BufferSizeBytes(), buffer.DefaultReorderWindow, cfg.RetentionDuration())
 	log.Printf("Initialized circular buffer with max size: %d MB, retention: %d days", cfg.Buffer.SizeMB, cfg.Buffer.RetentionDays)
 
-	// Start background retention eviction (runs every minute) so that entries
+	// Start background retention eviction (runs every 60 minutes) so that entries
 	// older than the retention window are purged even when no new logs arrive.
 	buf.StartRetentionEviction(60 * time.Minute)
 	defer buf.Stop()
 
-	// Restore buffer from persistence file if configured
+	// Restore buffer from persistence file if configured.
+	// buf.Load uses AddBatch which bypasses the ingest handler's reclassification
+	// and exclusion logic — this is intentional: persisted entries were already
+	// processed on first ingest and must be restored verbatim.
 	if cfg.Buffer.PersistPath != "" {
 		if err := buf.Load(cfg.Buffer.PersistPath); err != nil {
 			log.Printf("No previous buffer state found or failed to load: %v", err)
@@ -71,10 +74,14 @@ func main() {
 
 	// Create HTTP server
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler:      router,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr:        fmt.Sprintf(":%d", cfg.Server.Port),
+		Handler:     router,
+		ReadTimeout: 30 * time.Second,
+		// WriteTimeout is intentionally 0 (disabled) so that long-lived streaming
+		// connections (SSE via GET /mcp, WebSocket via /ws) are not killed by the
+		// server after 30 s. Individual non-streaming handlers are fast enough
+		// that they do not need a server-level write deadline.
+		WriteTimeout: 0,
 		IdleTimeout:  120 * time.Second,
 	}
 

@@ -10,7 +10,6 @@ interface LogTableProps {
   columns: ColumnConfig[];
   loading?: boolean;
   page: number;
-  totalPages: number;
   totalCount: number;
   limit: number;
   onPageChange: (page: number) => void;

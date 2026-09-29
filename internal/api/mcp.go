@@ -193,7 +193,11 @@ func (h *Handlers) HandleMCPGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess := sessions.create()
+	sess, err := sessions.create()
+	if err != nil {
+		http.Error(w, "failed to create session", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -246,6 +250,9 @@ func (h *Handlers) HandleMCPDelete(w http.ResponseWriter, r *http.Request) {
 // Without a session the handler falls back to the original inline
 // request/response behaviour.
 func (h *Handlers) HandleMCP(w http.ResponseWriter, r *http.Request) {
+	// Limit request body to 1 MB — generous for any valid JSON-RPC message.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	var req mcpRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -277,16 +284,14 @@ func (h *Handlers) HandleMCP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp := h.dispatch(req)
-
 	// Notifications (id == nil) have no response in JSON-RPC 2.0.
-	isNotification := req.ID == nil
-
-	if isNotification {
-		// Still acknowledge so the client knows we processed it.
+	// Checked before dispatch so we never build a response for them.
+	if req.ID == nil {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
+
+	resp := h.dispatch(req)
 
 	if sess != nil {
 		// Route response through the SSE stream.
@@ -311,7 +316,7 @@ func (h *Handlers) dispatch(req mcpRequest) mcpResponse {
 	switch req.Method {
 	case "initialize":
 		result = mcpInitializeResult{
-			ProtocolVersion: "2024-11-05",
+			ProtocolVersion: "2025-03-26",
 			Capabilities: map[string]interface{}{
 				"tools": map[string]interface{}{},
 			},
@@ -320,10 +325,6 @@ func (h *Handlers) dispatch(req mcpRequest) mcpResponse {
 				"version": "1.0.0",
 			},
 		}
-
-	case "notifications/initialized":
-		// Client acknowledgement — no result payload.
-		result = map[string]interface{}{}
 
 	case "tools/list":
 		result = mcpToolsListResult{Tools: mcpToolList()}
@@ -355,7 +356,7 @@ func (h *Handlers) handleToolCall(raw json.RawMessage) (interface{}, *mcpError) 
 	case "query_logs":
 		return h.mcpQueryLogs(params.Arguments)
 	default:
-		return nil, &mcpError{Code: mcpInvalidParams, Message: "Unknown tool: " + params.Name}
+		return nil, &mcpError{Code: mcpMethodNotFound, Message: "Unknown tool: " + params.Name}
 	}
 }
 

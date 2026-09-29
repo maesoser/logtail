@@ -113,6 +113,27 @@ export interface TopStats {
   total: number;
 }
 
+// Latency statistics from /health
+export interface LatencyStats {
+  count: number;
+  avgMs: number;
+  minMs: number;
+  maxMs: number;
+}
+
+// Health data from /health endpoint
+export interface HealthData {
+  status: string;
+  bufferCount: number;
+  bufferSizeBytes: number;
+  bufferUsedBytes: number;
+  wsClients: number;
+  latency: {
+    ingest: LatencyStats;
+    query: LatencyStats;
+  };
+}
+
 // WebSocket message types
 export interface WebSocketMessage {
   type: 'log_entry' | 'stats' | 'top_stats';

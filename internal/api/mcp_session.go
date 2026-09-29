@@ -3,7 +3,10 @@ package api
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -11,26 +14,31 @@ const (
 	// sessionTTL is how long a session lives with no activity before being reaped.
 	sessionTTL = 5 * time.Minute
 	// sessionSendBuffer is the number of outbound SSE messages that can be buffered
-	// before the sender blocks.
+	// before the message is dropped.
 	sessionSendBuffer = 64
 )
 
 // mcpSession represents an active SSE client connection.
 type mcpSession struct {
-	id        string
-	ch        chan string   // outbound SSE event payloads (JSON strings)
-	done      chan struct{}  // closed when the session is terminated
-	lastSeen  time.Time
+	id       string
+	ch       chan string  // outbound SSE event payloads (JSON strings)
+	done     chan struct{} // closed when the session is terminated
+	lastSeen atomic.Int64 // Unix nanoseconds, updated atomically to avoid data races
 }
 
 // send enqueues a JSON payload to be written to the SSE stream.
-// Returns false if the session is gone.
+// Returns false if the session is gone or the channel is full (message dropped).
+// Uses a non-blocking send so it never stalls the calling HTTP handler goroutine.
 func (s *mcpSession) send(payload string) bool {
 	select {
-	case s.ch <- payload:
-		s.lastSeen = time.Now()
-		return true
 	case <-s.done:
+		return false
+	case s.ch <- payload:
+		s.lastSeen.Store(time.Now().UnixNano())
+		return true
+	default:
+		// Channel full — drop the message rather than blocking the handler goroutine.
+		log.Printf("mcp: session %s channel full, dropping message", s.id)
 		return false
 	}
 }
@@ -59,18 +67,22 @@ func newSessionManager() *mcpSessionManager {
 }
 
 // create allocates a new session and registers it.
-func (m *mcpSessionManager) create() *mcpSession {
-	id := newSessionID()
-	s := &mcpSession{
-		id:       id,
-		ch:       make(chan string, sessionSendBuffer),
-		done:     make(chan struct{}),
-		lastSeen: time.Now(),
+// Returns an error if a cryptographically secure session ID cannot be generated.
+func (m *mcpSessionManager) create() (*mcpSession, error) {
+	id, err := newSessionID()
+	if err != nil {
+		return nil, err
 	}
+	s := &mcpSession{
+		id:   id,
+		ch:   make(chan string, sessionSendBuffer),
+		done: make(chan struct{}),
+	}
+	s.lastSeen.Store(time.Now().UnixNano())
 	m.mu.Lock()
 	m.sessions[id] = s
 	m.mu.Unlock()
-	return s
+	return s, nil
 }
 
 // get returns the session for id, or nil if not found.
@@ -99,14 +111,15 @@ func (m *mcpSessionManager) reaper() {
 	tick := time.NewTicker(sessionTTL / 2)
 	defer tick.Stop()
 	for range tick.C {
-		now := time.Now()
+		now := time.Now().UnixNano()
+		ttlNanos := sessionTTL.Nanoseconds()
 		m.mu.Lock()
 		for id, s := range m.sessions {
 			select {
 			case <-s.done:
 				delete(m.sessions, id)
 			default:
-				if now.Sub(s.lastSeen) > sessionTTL {
+				if now-s.lastSeen.Load() > ttlNanos {
 					delete(m.sessions, id)
 					s.close()
 				}
@@ -116,10 +129,11 @@ func (m *mcpSessionManager) reaper() {
 	}
 }
 
-func newSessionID() string {
+// newSessionID returns a 128-bit cryptographically random hex string.
+func newSessionID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		panic("mcp: failed to read random bytes: " + err.Error())
+		return "", fmt.Errorf("mcp: failed to generate session ID: %w", err)
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }

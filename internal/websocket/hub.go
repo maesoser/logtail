@@ -110,8 +110,10 @@ func (h *Hub) Run() {
 	}
 }
 
-// BroadcastLogEntry sends a new log entry to all connected clients
-func (h *Hub) BroadcastLogEntry(entry models.LogEntry) {
+// BroadcastLogEntry sends a new log entry to all connected clients.
+// entry is a pointer to the ring buffer slot and must not be retained after
+// this function returns — the value is marshalled to JSON before returning.
+func (h *Hub) BroadcastLogEntry(entry *models.LogEntry) {
 	msg := models.WebSocketMessage{
 		Type:    "log_entry",
 		Payload: entry,
@@ -123,10 +125,10 @@ func (h *Hub) BroadcastLogEntry(entry models.LogEntry) {
 		return
 	}
 
-	h.broadcast <- data
+	h.broadcastNonBlocking(data)
 }
 
-// BroadcastStats sends updated stats to all connected clients
+// BroadcastStats sends updated stats to all connected clients.
 func (h *Hub) BroadcastStats(stats models.Stats) {
 	msg := models.WebSocketMessage{
 		Type:    "stats",
@@ -139,10 +141,10 @@ func (h *Hub) BroadcastStats(stats models.Stats) {
 		return
 	}
 
-	h.broadcast <- data
+	h.broadcastNonBlocking(data)
 }
 
-// BroadcastTopStats sends updated top stats to all connected clients
+// BroadcastTopStats sends updated top stats to all connected clients.
 func (h *Hub) BroadcastTopStats(topStats models.TopStats) {
 	msg := models.WebSocketMessage{
 		Type:    "top_stats",
@@ -155,7 +157,18 @@ func (h *Hub) BroadcastTopStats(topStats models.TopStats) {
 		return
 	}
 
-	h.broadcast <- data
+	h.broadcastNonBlocking(data)
+}
+
+// broadcastNonBlocking attempts a non-blocking send to the broadcast channel.
+// If the channel is full the message is dropped to prevent goroutine leaks
+// in callers that run in their own goroutines (e.g. post-ingest stats push).
+func (h *Hub) broadcastNonBlocking(data []byte) {
+	select {
+	case h.broadcast <- data:
+	default:
+		log.Printf("websocket: broadcast channel full, dropping message (%d bytes)", len(data))
+	}
 }
 
 // ClientCount returns the number of connected clients

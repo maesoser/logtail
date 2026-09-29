@@ -12,6 +12,8 @@ interface ActivityHistogramProps {
   onTimeRangeChange: (range: TimeRange) => void;
   onBucketClick?: (from: string, to: string) => void;
   height?: number;
+  /** Hide the time-range tabs and peak label (e.g. when the parent provides its own shared selector) */
+  hideControls?: boolean;
 }
 
 // Severity levels ordered from bottom to top of stacked bar
@@ -108,7 +110,7 @@ function computeBucketTimeRange(
   return { from: bucketStart, to: bucketEnd };
 }
 
-export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeChange, onBucketClick, height = 80 }: ActivityHistogramProps) {
+export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeChange, onBucketClick, height = 80, hideControls = false }: ActivityHistogramProps) {
   const { maxCount, bars } = useMemo(() => {
     const max = Math.max(...data.map(b => b.count), 1);
     const barsData = data.map((bucket, index) => ({
@@ -131,20 +133,21 @@ export function ActivityHistogram({ data, bucketMinutes, timeRange, onTimeRangeC
 
   return (
     <LayerCard>
-      <LayerCard.Secondary className="flex items-center justify-between">
-        <Tabs
-          variant="segmented"
-          tabs={TIME_RANGE_TABS}
-          value={timeRange}
-          onValueChange={(v) => onTimeRangeChange(v as TimeRange)}
-        />
-        {!isMobile ? (
-          <span className="text-xs text-kumo-subtle">
-            Peak: {maxCount.toLocaleString()} logs/{formatBucketSize(bucketMinutes)}
-          </span>
-        ) : null}
-
-      </LayerCard.Secondary>
+      {!hideControls && (
+        <LayerCard.Secondary className="flex items-center justify-between">
+          <Tabs
+            variant="segmented"
+            tabs={TIME_RANGE_TABS}
+            value={timeRange}
+            onValueChange={(v) => onTimeRangeChange(v as TimeRange)}
+          />
+          {!isMobile ? (
+            <span className="text-xs text-kumo-subtle">
+              Peak: {maxCount.toLocaleString()} logs/{formatBucketSize(bucketMinutes)}
+            </span>
+          ) : null}
+        </LayerCard.Secondary>
+      )}
       
       <LayerCard.Primary className="p-3">
         <div 

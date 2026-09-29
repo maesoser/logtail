@@ -88,14 +88,7 @@ export function Settings({
   const [newErrorToWarningPattern, setNewErrorToWarningPattern] = useState('');
   const [reclassifyDirty, setReclassifyDirty] = useState(false);
 
-  // Fetch backend config when dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchConfig();
-    }
-  }, [isOpen]);
-
-  const fetchConfig = async () => {
+  const fetchConfig = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -126,7 +119,14 @@ export function Settings({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Fetch backend config when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchConfig();
+    }
+  }, [isOpen, fetchConfig]);
 
   const saveConfig = async (updates: {
     server?: { port?: number };
@@ -199,10 +199,14 @@ export function Settings({
 
   // Auth token handlers
 
-  const handleClearToken = () => {
-    saveConfig({ ingest: { authToken: '' } });
-    setAuthToken('');
-    setTokenDirty(false);
+  const handleClearToken = async () => {
+    try {
+      await saveConfig({ ingest: { authToken: '' } });
+    } catch {
+      // saveConfig sets the error state internally; keep dirty flag so the
+      // user can see the token field is still unsaved.
+      setTokenDirty(true);
+    }
   };
 
   // Exclusion pattern handlers
@@ -660,7 +664,7 @@ export function Settings({
                       ) : (
                         <ul className="space-y-1.5 max-h-40 overflow-y-auto">
                           {infoToErrorPatterns.map((pattern, index) => (
-                            <li key={index} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-kumo-tint rounded border border-kumo-line">
+                            <li key={pattern} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-kumo-tint rounded border border-kumo-line">
                               <code className="text-xs font-mono text-kumo-default truncate flex-1">{pattern}</code>
                               <Button
                                 variant="ghost"
@@ -726,8 +730,8 @@ export function Settings({
                         </p>
                       ) : (
                         <ul className="space-y-1.5 max-h-40 overflow-y-auto">
-                          {errorToWarningPatterns.map((pattern, index) => (
-                            <li key={index} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-kumo-tint rounded border border-kumo-line">
+                           {errorToWarningPatterns.map((pattern, index) => (
+                            <li key={pattern} className="flex items-center justify-between gap-2 px-3 py-1.5 bg-kumo-tint rounded border border-kumo-line">
                               <code className="text-xs font-mono text-kumo-default truncate flex-1">{pattern}</code>
                               <Button
                                 variant="ghost"
@@ -798,8 +802,8 @@ export function Settings({
                     ) : (
                       <ul className="space-y-2 flex-1 min-h-0 overflow-y-auto">
                         {exclusionPatterns.map((pattern, index) => (
-                          <li
-                            key={index}
+                           <li
+                             key={pattern}
                             className="flex items-center justify-between gap-2 px-3 py-2 bg-kumo-tint rounded-lg border border-kumo-line"
                           >
                             <code className="text-sm font-mono text-kumo-default truncate flex-1">
