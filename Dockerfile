@@ -7,7 +7,7 @@ COPY web/ ./
 RUN npm run build
 
 # Stage 2: Build backend
-FROM golang:1.22-alpine AS backend
+FROM golang:1.26-alpine AS backend
 WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache git
@@ -22,7 +22,7 @@ COPY --from=frontend /app/web/dist ./web/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o logtail ./cmd/logtail
 
 # Stage 3: Runtime
-FROM alpine:3.20
+FROM alpine:3.22
 # Add ca-certificates for HTTPS support and tzdata for timezone
 RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
